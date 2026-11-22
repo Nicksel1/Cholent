@@ -1,0 +1,3 @@
+# Netlify settings: no build step, publish this folder as-is.
+[build]
+  publish = "."
