@@ -12,6 +12,8 @@ const SITE = (process.env.SITE || process.env.URL || "https://cholent-chill.verc
 const INDEX = process.env.INDEX === "1" || (process.env.NETLIFY === "true" && process.env.CONTEXT === "production" && process.env.INDEX !== "0"); // preview builds stay out of search engines
 const IG = "https://www.instagram.com/cholent.and.chill/";
 const YT = "https://www.youtube.com/@cholentandchill";
+const FB = "https://www.facebook.com/CholentnChill";
+const WA = "https://chat.whatsapp.com/DpTCsz7u7jH3WHedGOWra5";
 const IG_DM = "https://ig.me/m/cholent.and.chill";
 const V = Date.now().toString(36);
 // Google key from the original site (Places photos, loaded in the browser). Override with GKEY in the build env.
@@ -46,6 +48,8 @@ const ICON = {
   waze: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 3h3.5l1.8 4.6-2.3 1.4a11 11 0 0 0 7 7l1.4-2.3L21 15.5V19a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2Z"/></svg>',
+  fb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H7.8v3h2.6V21h3.1Z"/></svg>',
+  wa: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1 2.7.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v13M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   locate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
@@ -188,11 +192,11 @@ const header = (home) => {
   return `<header class="hdr"><div class="wrap">
 <a class="logo" href="/">Cholent <span class="amp">&amp;</span> Chill</a>
 <nav class="nav" aria-label="Main">${links.filter(([k]) => k !== "#about").map(([k, t]) => `<a href="${h}${k}">${t}</a>`).join("")}</nav>
-<div class="hdr-social"><a class="icon-btn" href="${IG}" target="_blank" rel="noopener" aria-label="Instagram">${ICON.ig}</a><a class="icon-btn" href="${YT}" target="_blank" rel="noopener" aria-label="YouTube">${ICON.yt}</a></div>
+<div class="hdr-social"><a class="icon-btn" href="${IG}" target="_blank" rel="noopener" aria-label="Instagram">${ICON.ig}</a><a class="icon-btn" href="${YT}" target="_blank" rel="noopener" aria-label="YouTube">${ICON.yt}</a><a class="icon-btn" href="${FB}" target="_blank" rel="noopener" aria-label="Facebook">${ICON.fb}</a><a class="icon-btn" href="${WA}" target="_blank" rel="noopener" aria-label="WhatsApp">${ICON.wa}</a></div>
 <details class="menu"><summary class="icon-btn" aria-label="Menu"><span class="burger" aria-hidden="true"><i></i><i></i><i></i></span></summary>
 <nav class="menu-panel" aria-label="Menu" onclick="if(event.target.closest('a'))this.closest('details').open=false">
 ${links.filter(([k]) => k !== "#about").map(([k, t]) => `<a href="${h}${k}">${t}</a>`).join("")}
-<div class="menu-social"><a href="${IG}" target="_blank" rel="noopener">${ICON.ig} Instagram</a><a href="${YT}" target="_blank" rel="noopener">${ICON.yt} YouTube</a></div>
+<div class="menu-social"><a href="${IG}" target="_blank" rel="noopener">${ICON.ig} Instagram</a><a href="${YT}" target="_blank" rel="noopener">${ICON.yt} YouTube</a><a href="${FB}" target="_blank" rel="noopener">${ICON.fb} Facebook</a><a href="${WA}" target="_blank" rel="noopener">${ICON.wa} WhatsApp</a></div>
 </nav></details>
 </div></header>`;
 };
@@ -202,6 +206,7 @@ const footer = () => `<footer class="ftr"><div class="wrap">
 <div><p class="fh">Cities</p><ul>${CITY_PAGES.slice(0, 6).map((c) => `<li><a href="/cities/${citySlug(c)}/">${esc(c)}</a></li>`).join("")}</ul></div>
 <div><p class="fh">More cities</p><ul>${CITY_PAGES.slice(6, 12).map((c) => `<li><a href="/cities/${citySlug(c)}/">${esc(c)}</a></li>`).join("")}<li><a href="/#locations">All locations</a></li></ul></div>
 <div><p class="fh">Follow</p><ul><li><a href="${IG}" target="_blank" rel="noopener">Instagram</a></li><li><a href="${YT}" target="_blank" rel="noopener">YouTube</a></li><li><a href="/#add">Add a location</a></li></ul></div>
+<p class="legal"><strong>Please note:</strong> Cholent &amp; Chill is an independent review and directory platform, not the businesses listed. Hechsherim, opening hours, prices, addresses and whether a place is still open can change at any time, so always check with the business directly before you go. Ratings and reviews are personal opinions. Cholent &amp; Chill is not responsible for any business, its kashrut, its food or service, or anyone's experience there.</p>
 <div class="base"><span>© ${new Date().getFullYear()} Cholent &amp; Chill</span><span><a href="/admin/" style="color:inherit;text-decoration:none">Admin</a></span></div>
 </div></footer>
 <dialog class="player" id="player" aria-label="Video"><div class="box"><button class="icon-btn x" type="button" data-close aria-label="Close video">${ICON.x}</button><iframe title="Episode" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div></dialog>`;
