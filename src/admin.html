@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f3efe5">
+<title>Admin · Cholent &amp; Chill</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" as="font" type="font/woff2" href="/fonts/ultra-latin.woff2" crossorigin>
+<link rel="stylesheet" href="/styles.css">
+<style>
+body{background:var(--cream)}
+.adm{max-width:680px;margin:0 auto;padding:22px var(--gutter) 90px}
+.adm-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+.adm h1{font:400 32px/1.1 var(--f-display);margin:0 0 16px}
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 calc(var(--gutter)*-1) 22px;padding:0 var(--gutter);position:sticky;top:0;background:var(--cream);z-index:5;padding-top:8px;padding-bottom:8px}
+.tabs button{flex:none;height:40px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line-2);background:transparent;font-weight:600;font-size:14px;cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:24px;display:grid;gap:18px}
+.gate{max-width:360px;margin:14vh auto 0;text-align:center}
+.gate input{text-align:center;font:400 34px/1 var(--f-display);letter-spacing:.3em;border:0;border-bottom:2px solid var(--ink);background:transparent;width:100%;padding:10px 0;outline:none}
+.msg{font-size:14px;min-height:20px;margin:0}
+.msg.err{color:#a3261d}.msg.ok{color:var(--ok)}
+.found{display:flex;gap:10px;align-items:flex-start;background:var(--cream);border-radius:12px;padding:12px 14px;font-size:14px}
+.found b{display:block;font-size:15px}
+.found button{margin-left:auto;flex:none}
+.sbox{position:relative;margin-bottom:8px}
+.sbox input{width:100%;height:48px;border-radius:999px;border:1.5px solid var(--line-2);background:var(--paper);padding:0 18px;font-size:16px;outline:none}
+.sbox input:focus{border-color:var(--ink)}
+.items{list-style:none;margin:0;padding:0}
+.items li{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+.items .t{min-width:0;flex:1}
+.items strong{display:block;font:400 18px/1.2 var(--f-he);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.items .t span{font-size:13px;color:var(--ink-3)}
+.items .sc{flex:none;font:400 15px/1 var(--f-display);background:var(--tan);border-radius:999px;padding:6px 9px}
+.items li.off strong{text-decoration:line-through;color:var(--ink-3)}
+.count{font-size:14px;color:var(--ink-3);margin:6px 0 4px}
+.btn.wide{width:100%}
+.btn.danger{border-color:#a3261d;color:#a3261d;background:transparent}
+.opt{font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-3)}
+.sub-h{font:400 20px/1.1 var(--f-display);margin:6px 0 -4px}
+.row-btns{display:flex;gap:10px;flex-wrap:wrap}
+.row-btns .btn{flex:1}
+.pick{background:var(--cream);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px}
+.pick b{flex:1;font:400 18px/1.2 var(--f-he)}
+.sugg{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;max-height:260px;overflow-y:auto}
+.sugg li{padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer;font-size:15px}
+.sugg li:last-child{border-bottom:0}
+.sugg li:hover{background:var(--cream)}
+.sugg small{color:var(--ink-3)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="adm">
+
+<section class="gate" id="gate">
+<a class="logo" href="/" style="font-size:26px">Cholent <span class="amp">&amp;</span> Chill</a>
+<h1 style="margin-top:28px">Admin</h1>
+<form id="gate-form"><input id="code" type="password" autocomplete="current-password" maxlength="64" aria-label="Passcode" placeholder="••••"><p class="msg" id="gate-msg"></p><button class="btn wide" type="submit" id="gate-btn">Enter</button></form>
+</section>
+
+<section id="panel" hidden>
+<div class="adm-top"><a class="logo" href="/" style="font-size:22px">Cholent <span class="amp">&amp;</span> Chill</a><button class="btn ghost sm" type="button" id="lock">Lock</button></div>
+<div class="tabs" role="tablist">
+<button role="tab" data-tab="list" aria-selected="true">Locations</button>
+<button role="tab" data-tab="add" aria-selected="false">Add location</button>
+<button role="tab" data-tab="review" aria-selected="false">Add review</button>
+<button role="tab" data-tab="settings" aria-selected="false">Settings</button>
+</div>
+
+<!-- all locations -->
+<div data-pane="list">
+<div class="sbox"><input id="ls" type="search" placeholder="Search locations" autocomplete="off"></div>
+<p class="count" id="lcount"></p>
+<ul class="items" id="litems"></ul>
+<div class="more-wrap"><button class="btn ghost" type="button" id="lmore" hidden>Show more</button></div>
+</div>
+
+<!-- add / edit a location -->
+<div data-pane="add" hidden>
+<h1 id="form-title">Add a location</h1>
+<form class="card" id="locf" novalidate>
+<div class="f"><label for="a-name">Name</label><input id="a-name" required autocomplete="off"></div>
+<div class="f"><label for="a-en">English name <span class="opt">optional</span></label><input id="a-en" autocomplete="off"></div>
+<div class="f2">
+<div class="f"><label for="a-city">City</label><input id="a-city" required list="a-cities" autocomplete="off"><datalist id="a-cities"></datalist></div>
+<div class="f"><label for="a-days">Open</label><select id="a-days"><option value="Thursday">Thursday night</option><option value="Thu &amp; Fri">Thursday and Friday</option><option value="Wed-Fri">Wednesday to Friday</option><option value="All Week">All week</option></select></div>
+</div>
+<div class="f"><label for="a-address">Address</label><input id="a-address" autocomplete="off"></div>
+<div><button class="btn ghost sm" type="button" id="find">Find on Google Maps</button> <span class="msg" id="find-msg" style="margin-left:8px"></span></div>
+<div class="found" id="found" hidden></div>
+<div class="f2">
+<div class="f"><label for="a-kosher">Kashrut</label><input id="a-kosher" autocomplete="off"></div>
+<div class="f"><label for="a-phone">Phone</label><input id="a-phone" inputmode="tel" autocomplete="off"></div>
+</div>
+<p class="sub-h">Review <span class="opt" style="font:500 13px var(--f-body)">optional</span></p>
+<div class="f2">
+<div class="f"><label for="a-score">Score <span class="opt">out of 10</span></label><input id="a-score" inputmode="decimal" placeholder="8.5"></div>
+<div class="f"><label for="a-ep">Episode <span class="opt">e.g. S4 Ep 5</span></label><input id="a-ep" autocomplete="off"></div>
+</div>
+<div class="f"><label for="a-verdict">Verdict <span class="opt">one line</span></label><input id="a-verdict" autocomplete="off" maxlength="240"></div>
+<div class="f"><label for="a-video">YouTube link</label><input id="a-video" inputmode="url" autocomplete="off" placeholder="https://youtube.com/shorts/..."></div>
+<div class="f"><label for="a-price">Prices <span class="opt">optional</span></label><input id="a-price" autocomplete="off" placeholder="Cholent ₪45"></div>
+<p class="msg" id="loc-msg"></p>
+<div class="row-btns"><button class="btn" type="submit" id="save">Add location</button><button class="btn ghost" type="button" id="cancel" hidden>Cancel</button></div>
+<button class="btn danger wide" type="button" id="remove" hidden>Remove from the site</button>
+</form>
+</div>
+
+<!-- add a review to a location -->
+<div data-pane="review" hidden>
+<h1>Add a review</h1>
+<form class="card" id="revf" novalidate>
+<div class="f"><label for="r-q">Location</label><input id="r-q" autocomplete="off" placeholder="Start typing a name"></div>
+<ul class="sugg" id="r-sugg" hidden></ul>
+<div class="pick" id="r-pick" hidden><b id="r-name"></b><button class="btn ghost sm" type="button" id="r-change">Change</button></div>
+<div class="f2">
+<div class="f"><label for="r-score">Score <span class="opt">out of 10</span></label><input id="r-score" inputmode="decimal" placeholder="8.5"></div>
+<div class="f"><label for="r-ep">Episode <span class="opt">e.g. S4 Ep 5</span></label><input id="r-ep" autocomplete="off"></div>
+</div>
+<div class="f"><label for="r-verdict">Verdict <span class="opt">one line</span></label><input id="r-verdict" autocomplete="off" maxlength="240"></div>
+<div class="f"><label for="r-video">YouTube link</label><input id="r-video" inputmode="url" autocomplete="off" placeholder="https://youtube.com/shorts/..."></div>
+<div class="f"><label for="r-price">Prices <span class="opt">optional</span></label><input id="r-price" autocomplete="off"></div>
+<p class="msg" id="rev-msg"></p>
+<button class="btn wide" type="submit">Save review</button>
+</form>
+</div>
+
+<!-- settings -->
+<div data-pane="settings" hidden>
+<h1>Settings</h1>
+<form class="card" id="passf" novalidate>
+<p class="sub-h">Change passcode</p>
+<div class="f"><label for="p-new">New passcode <span class="opt">at least 4 characters</span></label><input id="p-new" type="password" autocomplete="new-password"></div>
+<div class="f"><label for="p-again">Type it again</label><input id="p-again" type="password" autocomplete="new-password"></div>
+<p class="msg" id="pass-msg"></p>
+<button class="btn wide" type="submit">Change passcode</button>
+</form>
+</div>
+
+</section>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const GKEY = "__GKEY__";
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const norm = (s) => String(s || "").toLowerCase().replace(/[֑-ׇ'’"״׳]/g, "");
+  let code = sessionStorage.getItem("cc_admin") || "";
+  let base = [], data = { added: [], edits: {}, hidden: [] }, all = [];
+  let editing = null, place = null, svc = null, reviewId = null, limit = 30;
+
+  const post = (body) => fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, code }) }).then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
+  const say = (el, text, cls = "") => { el.textContent = text; el.className = "msg " + cls; };
+
+  // ----- login -----
+  async function unlock(c) {
+    code = c;
+    const r = await post({ action: "check" });
+    if (!r.ok) { code = ""; sessionStorage.removeItem("cc_admin"); return false; }
+    sessionStorage.setItem("cc_admin", c);
+    $("#gate").hidden = true; $("#panel").hidden = false;
+    await load();
+    return true;
+  }
+  // First visit on a fresh site: no passcode exists yet, so he creates one here.
+  let setup = false;
+  fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "status" }) }).then((r) => r.json()).then((d) => {
+    if (!d.setup) return;
+    setup = true; $("#gate h1").textContent = "Create a passcode"; $("#gate-btn").textContent = "Save and enter"; $("#code").placeholder = "";
+  }).catch(() => {});
+  $("#gate-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); say($("#gate-msg"), "");
+    if (setup) {
+      const c = $("#code").value.trim();
+      if (c.length < 4) return say($("#gate-msg"), "Use at least 4 characters", "err");
+      const r = await fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setup", newCode: c }) });
+      if (!r.ok) return say($("#gate-msg"), "Couldn't save. Try again.", "err");
+      setup = false;
+    }
+    if (!(await unlock($("#code").value.trim()))) { say($("#gate-msg"), "Wrong code", "err"); $("#code").value = ""; $("#code").focus(); }
+  });
+  $("#lock").addEventListener("click", () => { sessionStorage.removeItem("cc_admin"); location.reload(); });
+  if (code) unlock(code); else $("#code").focus();
+
+  // ----- data -----
+  function merge() {
+    const hidden = new Set(data.hidden);
+    all = [
+      ...data.added.map((x) => ({ ...x, own: true })),
+      ...base.map((b) => ({ ...b, ...(data.edits[b.id] || {}), off: hidden.has(b.id) })),
+    ];
+    all.sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.score ?? -1) - (a.score ?? -1));
+    $("#a-cities").innerHTML = [...new Set(all.map((x) => x.city).filter(Boolean))].sort().map((c) => `<option value="${esc(c)}">`).join("");
+    renderList();
+  }
+  async function load() {
+    [base, data] = await Promise.all([
+      fetch("/data/spots.json").then((r) => r.json()).catch(() => []),
+      fetch("/api/data").then((r) => r.json()).catch(() => data),
+    ]);
+    merge();
+  }
+  const label = (x) => x.nameEn && x.nameEn !== x.name ? `${x.nameEn} · ${x.name}` : x.name;
+  function renderList() {
+    const q = norm($("#ls").value.trim());
+    const rows = all.filter((x) => !q || norm([x.name, x.nameEn, x.city, x.address].join(" ")).includes(q));
+    $("#lcount").textContent = `${rows.length} location${rows.length === 1 ? "" : "s"}`;
+    $("#litems").innerHTML = rows.slice(0, limit).map((x) => `<li class="${x.off ? "off" : ""}"><div class="t"><strong>${esc(label(x))}</strong><span>${esc(x.city || "No city")}${x.own ? " · added here" : ""}${x.off ? " · removed" : ""}</span></div>${x.score != null ? `<span class="sc">${Number(x.score).toFixed(1)}</span>` : ""}${x.off ? `<button class="btn ghost sm" type="button" data-restore="${x.id}">Restore</button>` : `<button class="btn ghost sm" type="button" data-edit="${x.id}">Edit</button>`}</li>`).join("");
+    $("#lmore").hidden = rows.length <= limit;
+  }
+  $("#ls").addEventListener("input", () => { limit = 30; renderList(); });
+  $("#lmore").addEventListener("click", () => { limit += 60; renderList(); });
+  $("#litems").addEventListener("click", async (e) => {
+    const ed = e.target.closest("[data-edit]"), rs = e.target.closest("[data-restore]");
+    if (ed) openForm(all.find((x) => x.id === ed.dataset.edit));
+    if (rs) { const r = await post({ action: "restore", id: rs.dataset.restore }); if (r.ok) { data = r.data.data; merge(); } }
+  });
+
+  // ----- tabs -----
+  function tab(name) {
+    $$("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+    $$("[data-pane]").forEach((p) => (p.hidden = p.dataset.pane !== name));
+    scrollTo(0, 0);
+  }
+  $$("[data-tab]").forEach((b) => b.addEventListener("click", () => { if (b.dataset.tab === "add") openForm(null); else tab(b.dataset.tab); }));
+
+  // ----- add / edit location -----
+  const F = { name: "#a-name", nameEn: "#a-en", city: "#a-city", days: "#a-days", address: "#a-address", kosher: "#a-kosher", phone: "#a-phone", score: "#a-score", ep: "#a-ep", verdict: "#a-verdict", video: "#a-video", price: "#a-price" };
+  function openForm(x) {
+    editing = x; place = null; $("#found").hidden = true; say($("#loc-msg"), ""); say($("#find-msg"), "");
+    $("#locf").reset();
+    if (x) for (const [k, sel] of Object.entries(F)) $(sel).value = k === "video" && x.video ? "https://youtu.be/" + x.video : x[k] ?? (k === "days" ? "Thursday" : "");
+    $("#form-title").textContent = x ? "Edit location" : "Add a location";
+    $("#save").textContent = x ? "Save changes" : "Add location";
+    $("#cancel").hidden = !x; $("#remove").hidden = !x;
+    tab("add");
+    $$("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === (x ? "list" : "add"))));
+    if (!x) $("#a-name").focus();
+  }
+  $("#cancel").addEventListener("click", () => tab("list"));
+  $("#remove").addEventListener("click", async () => {
+    if (!editing || !confirm(`Remove "${editing.name}" from the site?`)) return;
+    const r = await post({ action: "remove", id: editing.id });
+    if (r.ok) { data = r.data.data; merge(); tab("list"); }
+  });
+  $("#locf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const m = $("#loc-msg"); say(m, "");
+    const f = {};
+    for (const [k, sel] of Object.entries(F)) f[k] = $(sel).value.trim();
+    if (!f.name) { $("#a-name").focus(); return; }
+    if (!f.city) { $("#a-city").focus(); return; }
+    if (place) Object.assign(f, place);
+    $("#save").disabled = true;
+    const r = await post(editing ? { action: "update", id: editing.id, fields: f } : { action: "add", fields: f });
+    $("#save").disabled = false;
+    if (!r.ok) return say(m, r.data.error || "Couldn't save. Try again.", "err");
+    data = r.data.data; merge();
+    if (editing) { tab("list"); } else { $("#locf").reset(); place = null; $("#found").hidden = true; say(m, "Added. It's on the site now.", "ok"); $("#a-name").focus(); }
+  });
+
+  // Google lookup: fills the address, map position and listing photo
+  function maps() {
+    return new Promise((res, rej) => {
+      if (svc) return res();
+      window.__adm = () => { svc = new google.maps.places.PlacesService(document.createElement("div")); res(); };
+      const s = document.createElement("script");
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${GKEY}&libraries=places&callback=__adm&loading=async&language=he&region=IL`;
+      s.onerror = rej; document.head.append(s);
+    });
+  }
+  $("#find").addEventListener("click", async () => {
+    const q = [$("#a-name").value, $("#a-address").value, $("#a-city").value].filter(Boolean).join(" ");
+    const m = $("#find-msg");
+    if (!q.trim()) return say(m, "Type a name first");
+    say(m, "Searching…");
+    try {
+      await maps();
+      svc.findPlaceFromQuery({ query: q + " ישראל", fields: ["place_id", "name", "formatted_address", "geometry"] }, (res, status) => {
+        if (status !== "OK" || !res?.length) { say(m, "Not found on Google. You can still save it."); place = null; $("#found").hidden = true; return; }
+        const p = res[0];
+        place = { placeId: p.place_id, lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
+        say(m, "");
+        $("#found").hidden = false;
+        $("#found").innerHTML = `<div><b>${esc(p.name)}</b>${esc(p.formatted_address)}</div><button class="btn ghost sm" type="button" id="unfind">Not this</button>`;
+        if (!$("#a-address").value) $("#a-address").value = p.formatted_address.replace(/,?\s*(ישראל|Israel)$/, "");
+        $("#unfind").onclick = () => { place = null; $("#found").hidden = true; };
+      });
+    } catch (_) { say(m, "Google lookup isn't available right now."); }
+  });
+
+  // ----- add review -----
+  function pickReview(x) {
+    reviewId = x ? x.id : null;
+    $("#r-pick").hidden = !x; $("#r-q").parentElement.hidden = !!x; $("#r-sugg").hidden = true;
+    if (x) {
+      $("#r-name").textContent = label(x);
+      $("#r-score").value = x.score ?? ""; $("#r-ep").value = x.ep || ""; $("#r-verdict").value = x.verdict || "";
+      $("#r-video").value = x.video ? "https://youtu.be/" + x.video : ""; $("#r-price").value = x.price || "";
+      $("#r-score").focus();
+    } else { $("#r-q").value = ""; $("#r-q").focus(); }
+  }
+  $("#r-q").addEventListener("input", () => {
+    const q = norm($("#r-q").value.trim());
+    const hits = q ? all.filter((x) => !x.off && norm([x.name, x.nameEn, x.city].join(" ")).includes(q)).slice(0, 8) : [];
+    $("#r-sugg").hidden = !hits.length;
+    $("#r-sugg").innerHTML = hits.map((x) => `<li data-id="${x.id}">${esc(label(x))} <small>${esc(x.city || "")}</small></li>`).join("");
+  });
+  $("#r-sugg").addEventListener("click", (e) => { const li = e.target.closest("[data-id]"); if (li) pickReview(all.find((x) => x.id === li.dataset.id)); });
+  $("#r-change").addEventListener("click", () => pickReview(null));
+  $("#revf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const m = $("#rev-msg"); say(m, "");
+    if (!reviewId) { say(m, "Pick a location first", "err"); $("#r-q").focus(); return; }
+    const f = { score: $("#r-score").value.trim(), ep: $("#r-ep").value.trim(), verdict: $("#r-verdict").value.trim(), video: $("#r-video").value.trim(), price: $("#r-price").value.trim() };
+    const r = await post({ action: "update", id: reviewId, fields: f });
+    if (!r.ok) return say(m, r.data.error || "Couldn't save. Try again.", "err");
+    data = r.data.data; merge();
+    $("#revf").reset(); pickReview(null);
+    say(m, "Saved. Top rated is updated.", "ok");
+  });
+
+  // ----- settings -----
+  $("#passf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const m = $("#pass-msg"), a = $("#p-new").value, b = $("#p-again").value;
+    if (a.length < 4) return say(m, "Use at least 4 characters", "err");
+    if (a !== b) return say(m, "The two don't match", "err");
+    const r = await post({ action: "passcode", newCode: a });
+    if (!r.ok) return say(m, r.data.error || "Couldn't change it. Try again.", "err");
+    code = a; sessionStorage.setItem("cc_admin", a);
+    $("#passf").reset(); say(m, "Passcode changed.", "ok");
+  });
+})();
+</script>
+</body>
+</html>

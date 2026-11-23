@@ -1,24 +1,28 @@
-# Cholent & Chill — Coming Soon
+# Cholent & Chill
 
-The "Something big is cooking" landing page for chillingwithchill.com.
+The cholent directory site. Static pages plus two small server functions.
 
-- `index.html` — the whole page (HTML, CSS and a little JavaScript in one file).
-- `netlify.toml` — tells Netlify there's nothing to build; it just serves `index.html`.
+## Run it on Netlify
 
-## Editing
+1. In Netlify: **Add new site → Import an existing project → GitHub →** this repo.
+2. Leave the settings as they are (they come from `netlify.toml`: build `node scripts/build.mjs`, publish `dist`).
+3. Deploy. Then open `/admin` on the new site and create a passcode. Nothing else to set up.
 
-- **Social links:** near the top of the `<script>` at the bottom of `index.html`, fill in the `LINKS` object
-  (`instagram`, `youtube`, `facebook`, `whatsapp`). Empty links are hidden.
-- **Text:** the headline, subtitle and button text are plain HTML in `index.html`.
+Storage for the admin page is Netlify Blobs, which is built in.
 
-## Email sign-ups
+## Admin
 
-The form uses **Netlify Forms** (`data-netlify="true"`, form name `notify`).
-When the site is hosted on Netlify with form detection turned on, every sign-up appears under
-**Site → Forms → notify** in the Netlify dashboard, and can be downloaded as a CSV.
+`/admin` (also linked at the bottom of every page).
 
-## Deploying
+- **Locations:** every location, with edit, remove and restore.
+- **Add location / Add review:** score, verdict and YouTube link update the list, the map and Top rated straight away.
+- **Settings:** change the passcode.
 
-Connect this repository in Netlify (**Add new site → Import an existing project → GitHub**),
-leave the build command empty, and set the publish directory to `.` (already set in `netlify.toml`).
-Every push to `main` then goes live automatically.
+"This week's episode" and the Reviews grid read the YouTube channel feed, so they update when a video is posted.
+
+## Where things are
+
+- `src/data/listings.json` the original locations. `src/data/reviews.mjs` scores and verdicts. `src/data/names-en.mjs` English spellings for search.
+- `scripts/build.mjs` builds `dist/`. `scripts/og.mjs` re-renders the share images (needs Chrome and ffmpeg, only when a rated location changes).
+- `netlify/functions/` the two server functions (`/api/data` for the admin, `/api/latest` for the YouTube feed). `api/` holds the same two for Vercel.
+- The Google Maps key in `scripts/build.mjs` is the one from the original site. It loads listing photos in the browser.

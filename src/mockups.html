@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Home page mockups · Cholent &amp; Chill</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root{--ink:#17140f;--paper:#faf7f0;--cream:#f3efe5;--tan:#dca857;--line:#3a332a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#24201a;color:var(--paper);font:500 14px/1.2 system-ui,-apple-system,sans-serif}
+.bar{position:fixed;inset:0 0 auto 0;height:56px;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--ink);border-bottom:1px solid var(--line);z-index:5;overflow-x:auto}
+.grp{display:flex;gap:4px;background:#2a251e;border-radius:999px;padding:4px;flex:none}
+small{opacity:.6;font-size:12px}
+button{font:inherit;color:inherit;border:0;background:transparent;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+button[aria-pressed=true]{background:var(--tan);color:var(--ink)}
+.sp{flex:1}
+a.open{color:var(--paper);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:8px 14px;white-space:nowrap}
+.stage{position:fixed;inset:56px 0 0 0;overflow:auto;display:grid;place-items:start center}
+.stage.desk iframe{width:100%;height:100%;border:0;display:block;background:var(--cream)}
+.stage.desk{place-items:stretch}
+.phone{margin:28px auto 40px;width:417px;height:876px;border-radius:62px;background:#0c0a08;padding:12px;box-shadow:0 0 0 2px #3b352c,0 30px 80px -20px rgba(0,0,0,.7);position:relative}
+.phone::before{content:"";position:absolute;top:22px;left:50%;transform:translateX(-50%);width:120px;height:34px;border-radius:20px;background:#000;z-index:2}
+.phone iframe{width:393px;height:852px;border:0;border-radius:50px;display:block;background:var(--cream)}
+.note{color:#b9ad97;flex:none}
+</style>
+</head>
+<body>
+<div class="bar">
+<div class="grp" id="designs">
+<button data-v="o1" aria-pressed="true">1 · Pot, text at bottom</button>
+<button data-v="o2" aria-pressed="false">2 · Steam, text on top</button>
+<button data-v="o3" aria-pressed="false">3 · Cream and bowl</button>
+<button data-v="main" aria-pressed="false">Current</button>
+</div>
+<div class="grp" id="devices">
+<button data-d="desk" aria-pressed="true">Desktop</button>
+<button data-d="phone" aria-pressed="false">iPhone</button>
+</div>
+<span class="sp"></span>
+<span class="note" id="size"></span>
+<a class="open" id="open" href="/" target="_blank">Open full page</a>
+</div>
+<div class="stage desk" id="stage"><iframe id="f" title="Mockup" src="/"></iframe></div>
+<script>
+const st = { v: "o1", d: "phone" };
+const url = () => (st.v === "main" ? "/" : `/mockups/${st.v}/`);
+function render() {
+  document.querySelectorAll("[data-v]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === st.v));
+  document.querySelectorAll("[data-d]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.d === st.d));
+  const stage = document.getElementById("stage");
+  stage.className = "stage " + st.d;
+  stage.innerHTML = st.d === "desk" ? `<iframe title="Mockup" src="${url()}"></iframe>` : `<div class="phone"><iframe title="Mockup on iPhone" src="${url()}"></iframe></div>`;
+  document.getElementById("open").href = url();
+  document.getElementById("size").textContent = st.d === "desk" ? innerWidth + " × " + (innerHeight - 56) : "393 × 852 · iPhone 16";
+  history.replaceState(null, "", `#${st.v}-${st.d}`);
+}
+document.getElementById("designs").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (b) { st.v = b.dataset.v; render(); } });
+document.getElementById("devices").addEventListener("click", (e) => { const b = e.target.closest("[data-d]"); if (b) { st.d = b.dataset.d; render(); } });
+addEventListener("resize", () => { if (st.d === "desk") document.getElementById("size").textContent = innerWidth + " × " + (innerHeight - 56); });
+const [hv, hd] = location.hash.slice(1).split("-");
+if (hv) st.v = hv; if (hd) st.d = hd;
+render();
+</script>
+</body>
+</html>

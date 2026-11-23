@@ -1,0 +1,11 @@
+{
+  "name": "cholent-chill",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@vercel/blob": "^1.0.0",
+    "@netlify/blobs": "^8.1.0"
+  }
+}

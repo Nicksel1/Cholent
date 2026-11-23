@@ -1,3 +1,17 @@
-# Netlify settings: no build step, publish this folder as-is.
+# Netlify: build the site into dist/ and serve it. The two small server pieces live in netlify/functions.
 [build]
-  publish = "."
+  command = "node scripts/build.mjs"
+  publish = "dist"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
