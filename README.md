@@ -26,3 +26,7 @@ Storage for the admin page is Netlify Blobs, which is built in.
 - `scripts/build.mjs` builds `dist/`. `scripts/og.mjs` re-renders the share images (needs Chrome and ffmpeg, only when a rated location changes).
 - `netlify/functions/` the two server functions (`/api/data` for the admin, `/api/latest` for the YouTube feed). `api/` holds the same two for Vercel.
 - The Google Maps key in `scripts/build.mjs` is the one from the original site. It loads listing photos in the browser.
+
+## Note
+
+`index.html` in this folder is the old "coming soon" page. GitHub Pages still serves it. Netlify ignores it and serves the built site from `dist/`.
