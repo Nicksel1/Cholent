@@ -25,6 +25,10 @@ body{background:var(--cream)}
 .found{display:flex;gap:10px;align-items:flex-start;background:var(--cream);border-radius:12px;padding:12px 14px;font-size:14px}
 .found b{display:block;font-size:15px}
 .found button{margin-left:auto;flex:none}
+.pin{margin-top:4px}
+.pin-map{height:280px;border-radius:12px;overflow:hidden;background:var(--cream);border:1px solid rgba(0,0,0,.12)}
+.pin-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;margin-top:6px;opacity:.8}
+.pin-row button{margin-left:auto}
 .sbox{position:relative;margin-bottom:8px}
 .sbox input{width:100%;height:48px;border-radius:999px;border:1.5px solid var(--line-2);background:var(--paper);padding:0 18px;font-size:16px;outline:none}
 .sbox input:focus{border-color:var(--ink)}
@@ -91,6 +95,8 @@ body{background:var(--cream)}
 <div class="f"><label for="a-address">Address</label><input id="a-address" autocomplete="off"></div>
 <div><button class="btn ghost sm" type="button" id="find">Find on Google Maps</button> <span class="msg" id="find-msg" style="margin-left:8px"></span></div>
 <div class="found" id="found" hidden></div>
+<div class="f pin"><label>Map pin</label><div class="pin-map" id="pinmap"></div>
+<div class="pin-row"><span id="pin-msg">Tap the map to place the pin, or drag it.</span><button class="btn ghost sm" type="button" id="pin-clear" hidden>Remove pin</button></div></div>
 <div class="f2">
 <div class="f"><label for="a-kosher">Kashrut</label><input id="a-kosher" autocomplete="off"></div>
 <div class="f"><label for="a-phone">Phone</label><input id="a-phone" inputmode="tel" autocomplete="off"></div>
@@ -153,6 +159,7 @@ body{background:var(--cream)}
   let code = sessionStorage.getItem("cc_admin") || "";
   let base = [], data = { added: [], edits: {}, hidden: [] }, all = [];
   let editing = null, place = null, svc = null, reviewId = null, limit = 30;
+  let pin, pinMap = null, pinMarker = null; // pin: undefined = not touched, { lat, lng } = set on the map, null = removed
 
   const post = (body) => fetch("/api/data", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, code }) }).then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
   const say = (el, text, cls = "") => { el.textContent = text; el.className = "msg " + cls; };
@@ -240,6 +247,8 @@ body{background:var(--cream)}
     $("#cancel").hidden = !x; $("#remove").hidden = !x;
     tab("add");
     $$("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === (x ? "list" : "add"))));
+    pin = undefined;
+    showPin(x && x.lat && x.lng ? [x.lat, x.lng] : null, x?.city);
     if (!x) $("#a-name").focus();
   }
   $("#cancel").addEventListener("click", () => tab("list"));
@@ -256,12 +265,55 @@ body{background:var(--cream)}
     if (!f.name) { $("#a-name").focus(); return; }
     if (!f.city) { $("#a-city").focus(); return; }
     if (place) Object.assign(f, place);
+    if (pin !== undefined) { f.lat = pin ? pin.lat : ""; f.lng = pin ? pin.lng : ""; }
     $("#save").disabled = true;
     const r = await post(editing ? { action: "update", id: editing.id, fields: f } : { action: "add", fields: f });
     $("#save").disabled = false;
     if (!r.ok) return say(m, r.data.error || "Couldn't save. Try again.", "err");
     data = r.data.data; merge();
-    if (editing) { tab("list"); } else { $("#locf").reset(); place = null; $("#found").hidden = true; say(m, "Added. It's on the site now.", "ok"); $("#a-name").focus(); }
+    if (editing) { tab("list"); } else { $("#locf").reset(); place = null; $("#found").hidden = true; pin = undefined; showPin(null); say(m, "Added. It's on the site now.", "ok"); $("#a-name").focus(); }
+  });
+
+  // ----- map pin: tap or drag to set the location by hand -----
+  const CITY_CENTER = { "Jerusalem": [31.7857, 35.2007], "Bnei Brak": [32.0849, 34.8352], "Beit Shemesh": [31.7470, 34.9881], "Ashdod": [31.8014, 34.6435], "Beitar Illit": [31.6966, 35.1157], "Petah Tikva": [32.084, 34.8878], "Haifa": [32.794, 34.9896], "Elad": [32.0523, 34.9513], "Modi'in Illit": [31.9336, 35.0426], "Tel Aviv": [32.0853, 34.7818], "Netanya": [32.3215, 34.8532], "Tzfat": [32.9646, 35.496], "Tiberias": [32.7959, 35.531] };
+  function leaflet() {
+    if (window.L) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.append(l);
+      const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = res; s.onerror = rej; document.head.append(s);
+    });
+  }
+  function dropMarker() { if (pinMarker) { pinMap.removeLayer(pinMarker); pinMarker = null; } $("#pin-clear").hidden = true; }
+  function setPin(ll, byHand) {
+    if (!pinMarker) {
+      pinMarker = L.marker(ll, { draggable: true }).addTo(pinMap);
+      pinMarker.on("dragend", () => { const q = pinMarker.getLatLng(); setPin([q.lat, q.lng], true); });
+    } else pinMarker.setLatLng(ll);
+    $("#pin-clear").hidden = false;
+    if (byHand) {
+      pin = { lat: +ll[0].toFixed(6), lng: +ll[1].toFixed(6) };
+      say($("#pin-msg"), `Pin placed by hand (${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}). It's saved when you save the location.`);
+    }
+  }
+  async function showPin(ll, city) {
+    try { await leaflet(); } catch (_) { say($("#pin-msg"), "The map couldn't load. A pin can still come from Find on Google Maps."); return; }
+    if (!pinMap) {
+      pinMap = L.map("pinmap").setView([31.8, 35.0], 8);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(pinMap);
+      pinMap.on("click", (e) => setPin([e.latlng.lat, e.latlng.lng], true));
+    }
+    setTimeout(() => pinMap.invalidateSize(), 50);
+    if (ll) { setPin(ll, false); pinMap.setView(ll, 16); say($("#pin-msg"), "Tap the map to move the pin, or drag it."); }
+    else {
+      dropMarker();
+      pinMap.setView(CITY_CENTER[city] || [31.8, 35.0], CITY_CENTER[city] ? 13 : 8);
+      say($("#pin-msg"), "No pin yet. Tap the map to place it.");
+    }
+  }
+  $("#pin-clear").addEventListener("click", () => {
+    pin = null;
+    dropMarker();
+    say($("#pin-msg"), "Pin taken off. It's saved when you save the location.");
   });
 
   // Google lookup: fills the address, map position and listing photo
@@ -285,11 +337,13 @@ body{background:var(--cream)}
         if (status !== "OK" || !res?.length) { say(m, "Not found on Google. You can still save it."); place = null; $("#found").hidden = true; return; }
         const p = res[0];
         place = { placeId: p.place_id, lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
+        pin = undefined;
+        showPin([place.lat, place.lng]).then(() => say($("#pin-msg"), "Pin set from Google: " + p.formatted_address.replace(/,?\s*(ישראל|Israel)$/, "") + ". Check it's the right place, or drag it."));
         say(m, "");
         $("#found").hidden = false;
         $("#found").innerHTML = `<div><b>${esc(p.name)}</b>${esc(p.formatted_address)}</div><button class="btn ghost sm" type="button" id="unfind">Not this</button>`;
         if (!$("#a-address").value) $("#a-address").value = p.formatted_address.replace(/,?\s*(ישראל|Israel)$/, "");
-        $("#unfind").onclick = () => { place = null; $("#found").hidden = true; };
+        $("#unfind").onclick = () => { place = null; $("#found").hidden = true; pin = undefined; showPin(editing && editing.lat ? [editing.lat, editing.lng] : null, editing?.city); };
       });
     } catch (_) { say(m, "Google lookup isn't available right now."); }
   });
