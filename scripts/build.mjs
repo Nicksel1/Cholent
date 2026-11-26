@@ -74,6 +74,23 @@ const vidMeta = Object.fromEntries(rawVideos.map((v) => [v.id, v]));
 const isVertical = (id) => vidMeta[id] ? vidMeta[id].short !== false : true;
 const thumb = (id) => fs.existsSync(path.join(SRC, "img/ep", id + ".webp")) ? `/img/ep/${id}.webp` : null;
 
+// ---------- review dates ----------
+// A review's date is the day written in its video's description (when there is one), otherwise the upload date.
+// Descriptions come from the YouTube feed (newest videos) and from videos-raw.json (the saved list).
+const latestApi = createRequire(import.meta.url)("../api/latest.js");
+let feed = null;
+try {
+  feed = await Promise.race([
+    new Promise((ok) => latestApi({}, { setHeader() {}, status() { return this; }, json: ok })),
+    new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000)),
+  ]);
+} catch (e) { console.log("YouTube feed not reachable at build time:", e.message); }
+const feedById = Object.fromEntries((feed?.list || []).map((v) => [v.id, v]));
+const visitOf = (id) => (id && (feedById[id]?.visited || latestApi.visitDate(vidMeta[id]?.desc))) || "";
+let redated = 0;
+for (const r of [...REVIEWS, ...VISITS]) { const d = visitOf(r.video); if (d && d !== r.date) { r.date = d; redated++; } }
+if (redated) console.log(`Review dates taken from video descriptions: ${redated}`);
+
 // merge exact duplicates (same place, same address)
 const groups = new Map();
 for (const l of listings) {
@@ -157,16 +174,12 @@ let latest = REVIEWS.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.e
 // "This week's episode": ask the YouTube feed at build time, so the page is built with the newest
 // episode and doesn't swap the picture after it loads. Uses the same reader as /api/latest.
 // If YouTube can't be reached, the newest review above is used, as before.
-try {
-  const feed = await Promise.race([
-    new Promise((ok) => createRequire(import.meta.url)("../api/latest.js")({}, { setHeader() {}, status() { return this; }, json: ok })),
-    new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000)),
-  ]);
+{
   if (feed?.id && feed.id !== latest.video) {
     const known = [...REVIEWS, ...VISITS].find((r) => r.video === feed.id);
     latest = known ? { ...known, score: known.score ?? null } : { video: feed.id, name: feed.name, place: feed.place, score: feed.score ?? null };
   }
-} catch (e) { console.log("YouTube feed not reachable at build time, using the newest review:", e.message); }
+}
 const heroThumb = (id) => thumb(id) || `https://i.ytimg.com/vi/${id}/oar2.jpg`;
 
 // ---------- shared markup ----------
@@ -309,7 +322,7 @@ ${spots.map(row).join("\n")}
 <div class="reel">
 ${eps.map((v, i) => { const r = revByVideo[v.id]; const t = r ? r.name : cleanTitle(v.title); return `<button class="ep rv${i >= 6 ? " ep-more" : i >= 4 ? " ep-more-m" : ""}" type="button" data-yt="${v.id}" data-vertical="${v.short !== false}">
 <span class="ph"><img src="${thumb(v.id)}" alt="" loading="lazy" width="220" height="391"><span class="play"><span>${ICON.play}</span></span>${r?.score ? stamp(r.score, "sm") : ""}</span>
-<strong ${hasHe(t) ? 'lang="he" dir="rtl" style="font-family:var(--f-he);text-align:left"' : ""}>${esc(t)}</strong><span class="meta">${r ? esc(r.place) + " · " : ""}${ymd(v.date)}</span></button>`; }).join("\n")}
+<strong ${hasHe(t) ? 'lang="he" dir="rtl" style="font-family:var(--f-he);text-align:left"' : ""}>${esc(t)}</strong><span class="meta">${r ? esc(r.place) + " · " : ""}${visitOf(v.id) ? fmtDate(visitOf(v.id)) : ymd(v.date)}</span></button>`; }).join("\n")}
 </div>
 <div class="more-wrap eps-more-wrap"><button class="btn ghost" type="button" id="eps-more">Show more</button></div>
 </div></section>`,

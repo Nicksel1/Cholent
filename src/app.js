@@ -123,7 +123,7 @@
       const k = known[v.id], score = k?.s ?? v.score, name = k ? k.e || k.n : v.name;
       const b = document.createElement("button");
       b.className = "ep in"; b.type = "button"; b.dataset.yt = v.id; b.dataset.vertical = "true";
-      b.innerHTML = `<span class="ph"><img src="https://i.ytimg.com/vi/${v.id}/oar2.jpg" alt="" loading="lazy" width="220" height="391" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${v.id}/hqdefault.jpg'"><span class="play"><span>${ICON.play}</span></span>${score ? `<span class="stamp sm ${score >= 9 ? "top" : ""}">${score.toFixed(1)}<small>/10</small></span>` : ""}</span><strong>${esc(name)}</strong><span class="meta">${new Date(v.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>`;
+      b.innerHTML = `<span class="ph"><img src="https://i.ytimg.com/vi/${v.id}/oar2.jpg" alt="" loading="lazy" width="220" height="391" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${v.id}/hqdefault.jpg'"><span class="play"><span>${ICON.play}</span></span>${score ? `<span class="stamp sm ${score >= 9 ? "top" : ""}">${score.toFixed(1)}<small>/10</small></span>` : ""}</span><strong>${esc(name)}</strong><span class="meta">${new Date(v.visited || v.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>`;
       reel.prepend(b);
     }
     $$(".ep", reel).forEach((el, k) => { el.classList.toggle("ep-more", k >= 6); el.classList.toggle("ep-more-m", k >= 4 && k < 6); });
