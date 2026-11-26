@@ -89,6 +89,11 @@ export default async (req) => {
       else if (id && !d.hidden.includes(id)) d.hidden.push(id);
     } else if (b.action === "restore") {
       d.hidden = d.hidden.filter((x) => x !== id);
+    } else if (b.action === "sync") {
+      // "Update from YouTube now": rebuild, which re-reads the channel and adds new rated videos as locations.
+      if (!process.env.BUILD_HOOK_URL) return json({ error: "BUILD_HOOK_URL isn't set in Netlify yet" }, 400);
+      await rebuild();
+      return json({ ok: true, data: d });
     } else if (b.action === "hideVideo" || b.action === "showVideo") {
       const v = (/(?:v=|shorts\/|youtu\.be\/|embed\/)([\w-]{11})/.exec(clean(b.video, 200)) || /^([\w-]{11})$/.exec(clean(b.video, 20)) || [])[1];
       if (!v) return json({ error: "That doesn't look like a YouTube link" }, 400);

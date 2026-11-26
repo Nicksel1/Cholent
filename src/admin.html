@@ -146,6 +146,12 @@ body{background:var(--cream)}
 <!-- settings -->
 <div data-pane="settings" hidden>
 <h1>Settings</h1>
+<div class="card">
+<p class="sub-h">Update from YouTube</p>
+<p style="margin:0;font-size:14px;opacity:.8">The site reads your channel by itself: new rated videos become locations within about an hour, and everything is refreshed every Thursday. Use this to do it right now. A video becomes a location when its description has a rating and a location, e.g. <b>Location: HaRav Kook 12, Jerusalem</b> and <b>Final rating: 9.2/10</b>.</p>
+<p class="msg" id="sync-msg"></p>
+<button class="btn wide" type="button" id="sync">Update from YouTube now</button>
+</div>
 <form class="card" id="vidf" novalidate>
 <p class="sub-h">Hidden videos</p>
 <p style="margin:0;font-size:14px;opacity:.8">Videos on this list never appear on the website (not in "This week's episode", not in the Reviews strip). Nothing changes on YouTube.</p>
@@ -230,6 +236,13 @@ body{background:var(--cream)}
     ]);
     merge();
   }
+  $("#sync").addEventListener("click", async () => {
+    $("#sync").disabled = true; say($("#sync-msg"), "Asking the site to update…");
+    const r = await post({ action: "sync" });
+    $("#sync").disabled = false;
+    if (!r.ok) return say($("#sync-msg"), r.data.error || "Couldn't start the update. Try again.", "err");
+    say($("#sync-msg"), "Updating. New videos show up in about a minute.", "ok");
+  });
   function renderVideos() {
     const ids = data.videos || [];
     $("#vlist").innerHTML = ids.length ? ids.map((v) => `<li><img src="https://i.ytimg.com/vi/${v}/hqdefault.jpg" alt=""><a href="https://youtu.be/${v}" target="_blank" rel="noopener">youtu.be/${v}</a><button class="btn ghost sm" type="button" data-show="${v}">Show again</button></li>`).join("") : '<li style="background:none;padding:0;font-size:14px;opacity:.7">No hidden videos.</li>';
@@ -254,7 +267,7 @@ body{background:var(--cream)}
     const q = norm($("#ls").value.trim());
     const rows = all.filter((x) => !q || norm([x.name, x.nameEn, x.city, x.address].join(" ")).includes(q));
     $("#lcount").textContent = `${rows.length} location${rows.length === 1 ? "" : "s"}`;
-    $("#litems").innerHTML = rows.slice(0, limit).map((x) => `<li class="${x.off ? "off" : ""}"><div class="t"><strong>${esc(label(x))}</strong><span>${esc(x.city || "No city")}${x.own ? " · added here" : ""}${x.off ? " · removed" : ""}${x.closed ? " · CLOSED" : ""}</span></div>${x.score != null ? `<span class="sc">${Number(x.score).toFixed(1)}</span>` : ""}${x.off ? `<button class="btn ghost sm" type="button" data-restore="${x.id}">Restore</button>` : `<button class="btn ghost sm" type="button" data-edit="${x.id}">Edit</button>`}</li>`).join("");
+    $("#litems").innerHTML = rows.slice(0, limit).map((x) => `<li class="${x.off ? "off" : ""}"><div class="t"><strong>${esc(label(x))}</strong><span>${esc(x.city || "No city")}${x.own ? " · added here" : ""}${x.off ? " · removed" : ""}${x.closed ? " · CLOSED" : ""}${x.auto === "pin" ? " · from YouTube, check the pin" : x.auto ? " · from YouTube" : ""}</span></div>${x.score != null ? `<span class="sc">${Number(x.score).toFixed(1)}</span>` : ""}${x.off ? `<button class="btn ghost sm" type="button" data-restore="${x.id}">Restore</button>` : `<button class="btn ghost sm" type="button" data-edit="${x.id}">Edit</button>`}</li>`).join("");
     $("#lmore").hidden = rows.length <= limit;
   }
   $("#ls").addEventListener("input", () => { limit = 30; renderList(); });
