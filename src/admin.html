@@ -25,7 +25,7 @@ body{background:var(--cream)}
 .found{display:flex;gap:10px;align-items:flex-start;background:var(--cream);border-radius:12px;padding:12px 14px;font-size:14px}
 .found b{display:block;font-size:15px}
 .found button{margin-left:auto;flex:none}
-.pin{margin-top:4px}
+.pin-field{margin-top:4px}
 .pin-map{height:280px;border-radius:12px;overflow:hidden;background:var(--cream);border:1px solid rgba(0,0,0,.12)}
 .pin-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;margin-top:6px;opacity:.8}
 .pin-row button{margin-left:auto}
@@ -95,7 +95,7 @@ body{background:var(--cream)}
 <div class="f"><label for="a-address">Address</label><input id="a-address" autocomplete="off"></div>
 <div><button class="btn ghost sm" type="button" id="find">Find on Google Maps</button> <span class="msg" id="find-msg" style="margin-left:8px"></span></div>
 <div class="found" id="found" hidden></div>
-<div class="f pin"><label>Map pin</label><div class="pin-map" id="pinmap"></div>
+<div class="f pin-field"><label>Map pin</label><div class="pin-map" id="pinmap"></div>
 <div class="pin-row"><span id="pin-msg">Tap the map to place the pin, or drag it.</span><button class="btn ghost sm" type="button" id="pin-clear" hidden>Remove pin</button></div></div>
 <div class="f2">
 <div class="f"><label for="a-kosher">Kashrut</label><input id="a-kosher" autocomplete="off"></div>
