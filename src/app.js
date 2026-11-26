@@ -123,7 +123,7 @@
       const k = known[v.id], score = k?.s ?? v.score, name = k ? k.e || k.n : v.name;
       const b = document.createElement("button");
       b.className = "ep in"; b.type = "button"; b.dataset.yt = v.id; b.dataset.vertical = "true";
-      b.innerHTML = `<span class="ph"><img src="https://i.ytimg.com/vi/${v.id}/oar2.jpg" alt="" loading="lazy" width="220" height="391" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${v.id}/hqdefault.jpg'"><span class="play"><span>${ICON.play}</span></span>${score ? `<span class="stamp sm ${score >= 9 ? "top" : ""}">${score.toFixed(1)}<small>/10</small></span>` : ""}</span><strong>${esc(name)}</strong><span class="meta">${new Date(v.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>`;
+      b.innerHTML = `<span class="ph"><img src="https://i.ytimg.com/vi/${v.id}/oar2.jpg" alt="" loading="lazy" width="220" height="391" onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${v.id}/hqdefault.jpg'"><span class="play"><span>${ICON.play}</span></span>${score ? `<span class="stamp sm ${score >= 9 ? "top" : ""}">${score.toFixed(1)}<small>/10</small></span>` : ""}</span><strong>${esc(name)}</strong><span class="meta">${new Date(v.visited || v.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>`;
       reel.prepend(b);
     }
     $$(".ep", reel).forEach((el, k) => { el.classList.toggle("ep-more", k >= 6); el.classList.toggle("ep-more-m", k >= 4 && k < 6); });
@@ -461,8 +461,11 @@ ${s.u ? `<a class="more-link" href="${s.u}">Full page →</a>` : ""}`;
   function rowEl(x) {
     const li = document.createElement("li");
     li.className = "row"; li.dataset.id = x.i;
-    const img = x.im || (x.v ? yt(x.v) : "");
-    li.innerHTML = `<a href="${x.u || x.g}"${x.u ? "" : ' target="_blank" rel="noopener"'}><span class="ph"${x.pid ? ` data-pid="${x.pid}"` : ""}>${img ? `<img src="${img}" alt="" loading="lazy" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(x.l)}</span>`}</span>
+    // rated (filmed): episode thumbnail. Not rated: Google Maps photo, or the video if there's no Google listing.
+    const vimg = x.v ? (x.im || yt(x.v)) : "";
+    const pid = (x.s != null && vimg) ? "" : x.pid;
+    const img = pid ? "" : vimg;
+    li.innerHTML = `<a href="${x.u || x.g}"${x.u ? "" : ' target="_blank" rel="noopener"'}><span class="ph"${pid ? ` data-pid="${pid}"` : ""}>${img ? `<img src="${img}" alt="" loading="lazy" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(x.l)}</span>`}</span>
 <span class="nm"><strong>${x.e ? `<span class="en">${esc(x.e)}</span>` : `<span lang="he" dir="rtl">${esc(x.n)}</span>`}</strong><span class="sub">${esc(x.c)} · ${esc(DAYS[x.d] || x.d)}</span></span>
 <span class="side">${x.s != null ? `<span class="stamp sm ${x.s >= 9 ? "top" : ""}">${x.s.toFixed(1)}<small>/10</small></span>` : x.v ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span></a>`;
     return li;

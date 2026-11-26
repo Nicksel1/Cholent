@@ -74,6 +74,23 @@ const vidMeta = Object.fromEntries(rawVideos.map((v) => [v.id, v]));
 const isVertical = (id) => vidMeta[id] ? vidMeta[id].short !== false : true;
 const thumb = (id) => fs.existsSync(path.join(SRC, "img/ep", id + ".webp")) ? `/img/ep/${id}.webp` : null;
 
+// ---------- review dates ----------
+// A review's date is the day written in its video's description (when there is one), otherwise the upload date.
+// Descriptions come from the YouTube feed (newest videos) and from videos-raw.json (the saved list).
+const latestApi = createRequire(import.meta.url)("../api/latest.js");
+let feed = null;
+try {
+  feed = await Promise.race([
+    new Promise((ok) => latestApi({}, { setHeader() {}, status() { return this; }, json: ok })),
+    new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000)),
+  ]);
+} catch (e) { console.log("YouTube feed not reachable at build time:", e.message); }
+const feedById = Object.fromEntries((feed?.list || []).map((v) => [v.id, v]));
+const visitOf = (id) => (id && (feedById[id]?.visited || latestApi.visitDate(vidMeta[id]?.desc))) || "";
+let redated = 0;
+for (const r of [...REVIEWS, ...VISITS]) { const d = visitOf(r.video); if (d && d !== r.date) { r.date = d; redated++; } }
+if (redated) console.log(`Review dates taken from video descriptions: ${redated}`);
+
 // merge exact duplicates (same place, same address)
 const groups = new Map();
 for (const l of listings) {
@@ -157,16 +174,12 @@ let latest = REVIEWS.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.e
 // "This week's episode": ask the YouTube feed at build time, so the page is built with the newest
 // episode and doesn't swap the picture after it loads. Uses the same reader as /api/latest.
 // If YouTube can't be reached, the newest review above is used, as before.
-try {
-  const feed = await Promise.race([
-    new Promise((ok) => createRequire(import.meta.url)("../api/latest.js")({}, { setHeader() {}, status() { return this; }, json: ok })),
-    new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000)),
-  ]);
+{
   if (feed?.id && feed.id !== latest.video) {
     const known = [...REVIEWS, ...VISITS].find((r) => r.video === feed.id);
     latest = known ? { ...known, score: known.score ?? null } : { video: feed.id, name: feed.name, place: feed.place, score: feed.score ?? null };
   }
-} catch (e) { console.log("YouTube feed not reachable at build time, using the newest review:", e.message); }
+}
 const heroThumb = (id) => thumb(id) || `https://i.ytimg.com/vi/${id}/oar2.jpg`;
 
 // ---------- shared markup ----------
@@ -216,6 +229,16 @@ ${links.filter(([k]) => k !== "#about").map(([k, t]) => `<a href="${h}${k}">${t}
 </div></header>`;
 };
 
+// List picture: a rated spot (filmed) shows the episode thumbnail; an unrated one shows its Google Maps photo.
+// If an unrated spot has no Google listing but has a video, the video thumbnail is used instead.
+const rowPhoto = (s) => {
+  const ytImg = s.video ? (s.img || `https://i.ytimg.com/vi/${s.video}/hqdefault.jpg`) : "";
+  const img = (src) => `<span class="ph"><img src="${src}" alt="" loading="lazy" decoding="async" width="64" height="64"></span>`;
+  if (s.score != null && ytImg) return img(ytImg);
+  if (s.placeId) return `<span class="ph" data-pid="${s.placeId}"><span class="tile" aria-hidden="true">${esc(initial(s))}</span></span>`;
+  if (ytImg) return img(ytImg);
+  return `<span class="ph"><span class="tile" aria-hidden="true">${esc(initial(s))}</span></span>`;
+};
 const footer = () => `<footer class="ftr"><div class="wrap">
 <div><a class="logo" href="/">Cholent <span class="amp">&amp;</span> Chill</a></div>
 <div><p class="fh">Cities</p><ul>${CITY_PAGES.slice(0, 6).map((c) => `<li><a href="/cities/${citySlug(c)}/">${esc(c)}</a></li>`).join("")}</ul></div>
@@ -232,7 +255,7 @@ const nameHtml = (s) => s.en ? `<span class="en">${esc(s.en)}</span>` : `<span l
 const sub = (s) => [s.cityLabel, DAYS[s.days] || s.days].filter(Boolean).join(" · ");
 
 const row = (s) => `<li class="row" data-id="${s.id}"><a href="${s.url}">
-<span class="ph"${s.placeId ? ` data-pid="${s.placeId}"` : ""}>${s.real ? `<img src="${s.img}" alt="" loading="lazy" decoding="async" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(initial(s))}</span>`}</span>
+${rowPhoto(s)}
 <span class="nm"><strong>${nameHtml(s)}</strong><span class="sub">${esc(sub(s))}</span>${s.kosher ? `<span class="k" lang="${hasHe(s.kosher) ? "he" : "en"}">${esc(s.kosher)}</span>` : ""}</span>
 <span class="side">${s.score != null ? stamp(s.score, "sm") : s.video ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span>
 </a></li>`;
@@ -309,7 +332,7 @@ ${spots.map(row).join("\n")}
 <div class="reel">
 ${eps.map((v, i) => { const r = revByVideo[v.id]; const t = r ? r.name : cleanTitle(v.title); return `<button class="ep rv${i >= 6 ? " ep-more" : i >= 4 ? " ep-more-m" : ""}" type="button" data-yt="${v.id}" data-vertical="${v.short !== false}">
 <span class="ph"><img src="${thumb(v.id)}" alt="" loading="lazy" width="220" height="391"><span class="play"><span>${ICON.play}</span></span>${r?.score ? stamp(r.score, "sm") : ""}</span>
-<strong ${hasHe(t) ? 'lang="he" dir="rtl" style="font-family:var(--f-he);text-align:left"' : ""}>${esc(t)}</strong><span class="meta">${r ? esc(r.place) + " · " : ""}${ymd(v.date)}</span></button>`; }).join("\n")}
+<strong ${hasHe(t) ? 'lang="he" dir="rtl" style="font-family:var(--f-he);text-align:left"' : ""}>${esc(t)}</strong><span class="meta">${r ? esc(r.place) + " · " : ""}${visitOf(v.id) ? fmtDate(visitOf(v.id)) : ymd(v.date)}</span></button>`; }).join("\n")}
 </div>
 <div class="more-wrap eps-more-wrap"><button class="btn ghost" type="button" id="eps-more">Show more</button></div>
 </div></section>`,
@@ -605,7 +628,7 @@ ${r?.ep ? `<div class="label">${esc(r.ep)}</div>` : ""}
 <h1>${s.en ? `<span class="en">${esc(s.en)}</span>` : `<span lang="he" dir="rtl">${esc(s.name)}</span>`}</h1>
 ${s.en && s.he ? `<div class="alt" lang="he" dir="rtl">${esc(s.he)}</div>` : ""}
 <div class="where">${esc(where)}</div>
-${r?.verdict ? `<div class="verdict">${stamp(s.score, "xl")}<div><blockquote>“${esc(r.verdict)}”</blockquote><cite>Nechemiah Seltzer${r.date ? ", " + fmtDate(r.date) : ""}${r.comped ? ' · <span class="comp" style="margin-left:0">Comped</span>' : ""}</cite></div></div>` : ""}
+${r?.verdict ? `<div class="verdict">${stamp(s.score, "xl")}<div><blockquote>“${esc(r.verdict)}”</blockquote>${r.date || r.comped ? `<cite>${[r.date ? fmtDate(r.date) : "", r.comped ? '<span class="comp" style="margin-left:0">Comped</span>' : ""].filter(Boolean).join(" · ")}</cite>` : ""}</div></div>` : ""}
 ${r?.more ? `<p class="more">${esc(r.more)}</p>` : ""}
 </div>
 ${media(s)}
