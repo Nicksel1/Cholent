@@ -628,7 +628,7 @@ ${r?.ep ? `<div class="label">${esc(r.ep)}</div>` : ""}
 <h1>${s.en ? `<span class="en">${esc(s.en)}</span>` : `<span lang="he" dir="rtl">${esc(s.name)}</span>`}</h1>
 ${s.en && s.he ? `<div class="alt" lang="he" dir="rtl">${esc(s.he)}</div>` : ""}
 <div class="where">${esc(where)}</div>
-${r?.verdict ? `<div class="verdict">${stamp(s.score, "xl")}<div><blockquote>“${esc(r.verdict)}”</blockquote><cite>Nechemiah Seltzer${r.date ? ", " + fmtDate(r.date) : ""}${r.comped ? ' · <span class="comp" style="margin-left:0">Comped</span>' : ""}</cite></div></div>` : ""}
+${r?.verdict ? `<div class="verdict">${stamp(s.score, "xl")}<div><blockquote>“${esc(r.verdict)}”</blockquote>${r.date || r.comped ? `<cite>${[r.date ? fmtDate(r.date) : "", r.comped ? '<span class="comp" style="margin-left:0">Comped</span>' : ""].filter(Boolean).join(" · ")}</cite>` : ""}</div></div>` : ""}
 ${r?.more ? `<p class="more">${esc(r.more)}</p>` : ""}
 </div>
 ${media(s)}

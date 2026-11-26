@@ -98,7 +98,7 @@
       if (score == null && !text) { v?.remove(); }
       else {
         if (!v) { v = document.createElement("div"); v.className = "verdict"; $(".spot .where")?.after(v); }
-        v.innerHTML = `${score != null ? `<span class="stamp xl ${score >= 9 ? "top" : ""}">${score.toFixed(1)}<small>/10</small></span>` : ""}<div>${text ? `<blockquote>“${esc(text)}”</blockquote>` : ""}<cite>Nechemiah Seltzer</cite></div>`;
+        v.innerHTML = `${score != null ? `<span class="stamp xl ${score >= 9 ? "top" : ""}">${score.toFixed(1)}<small>/10</small></span>` : ""}<div>${text ? `<blockquote>“${esc(text)}”</blockquote>` : ""}${v?.querySelector("cite")?.outerHTML || ""}</div>`;
       }
     }
     if (f.video) {
