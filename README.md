@@ -30,3 +30,31 @@ Storage for the admin page is Netlify Blobs, which is built in.
 ## Note
 
 `index.html` in this folder is the old "coming soon" page. GitHub Pages still serves it. Netlify ignores it and serves the built site from `dist/`.
+
+## Google Sheet (optional, recommended)
+
+The location list can live in a Google Sheet: **Cholent & Chill – Locations** in Nechemiah's Google Drive.
+When it is connected, the site and the admin page both use it:
+
+- Edit a row, add a row, or put **yes** in **Hidden** in the Sheet, and the site shows it within about a minute. No rebuild needed.
+- Changes made in `/admin` are written into the Sheet, so the Sheet is always the full list.
+- Rows are never deleted by the site. Removing a location in `/admin` sets **Hidden** to yes; clear it to bring the location back.
+- Column headers are matched by name, so you can reorder columns or add your own. Keep the **ID** column as it is: it links each row to its page on the site.
+- The admin passcode stays in Netlify Blobs, as before.
+
+To connect it, add two environment variables in Netlify (Site configuration → Environment variables), then redeploy:
+
+| Name | Value |
+|---|---|
+| `GOOGLE_SHEET_ID` | `1TAmE5lyy-qGNuK6pQAS0roEFs16SFRv21hVCgIABXHU` |
+| `GOOGLE_SERVICE_ACCOUNT` | The whole JSON key file of a Google Cloud service account that has the Google Sheets API enabled |
+
+Then share the Sheet (Share button) with the service account's email address (the `client_email` in the key file) as **Editor**.
+
+Without these two settings the site works exactly as before and keeps its admin changes in Netlify Blobs.
+The code is in `lib/sheet.mjs` and `netlify/functions/data.mjs`.
+
+## Daily rebuild
+
+`netlify/functions/daily-rebuild.mjs` rebuilds the site once a day so the newest YouTube episode is built into the homepage.
+It needs `BUILD_HOOK_URL` set in Netlify (create one under Site configuration → Build & deploy → Build hooks).

@@ -1,6 +1,7 @@
 // Netlify version of the admin data API. Storage is Netlify Blobs (built in, nothing to set up).
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
+import { sheetOn, readRows, writeRow, overlay } from "../../lib/sheet.mjs";
 
 const EMPTY = { added: [], edits: {}, hidden: [] };
 const store = () => getStore({ name: "cholent-chill", consistency: "strong" });
@@ -43,11 +44,54 @@ function fields(b) {
   return o;
 }
 
+// ---------- Google Sheet mode (when GOOGLE_SERVICE_ACCOUNT and GOOGLE_SHEET_ID are set) ----------
+let baseCache = null, sheetCache = null;
+async function baseList(req) {
+  if (baseCache && baseCache.at > Date.now() - 600_000) return baseCache.list;
+  const origin = process.env.URL || new URL(req.url).origin;
+  const list = await fetch(origin + "/data/spots.json").then((r) => r.json());
+  baseCache = { at: Date.now(), list };
+  return list;
+}
+async function sheetData(req, fresh = false) {
+  if (!fresh && sheetCache && sheetCache.at > Date.now() - 30_000) return sheetCache.data;
+  const [sheet, base] = await Promise.all([readRows(), baseList(req)]);
+  const data = overlay(sheet.rows, base, fields);
+  sheetCache = { at: Date.now(), data, sheet };
+  return data;
+}
+async function sheetAction(req, b) {
+  await sheetData(req, true);
+  const sheet = sheetCache.sheet, base = await baseList(req);
+  const id = clean(b.id, 80), f = fields(b.fields || {});
+  const rowOf = (x) => sheet.rows.find((r) => String(r.id).trim() === x || (!String(r.id).trim() && "row" + r._row === x));
+  if (b.action === "add") {
+    if (!f.name || !f.city) return json({ error: "Name and city are required" }, 400);
+    await writeRow(sheet, null, { days: "Thursday", ...f, id: "x" + Date.now().toString(36), visited: f.score != null ? "yes" : "", notes: "Added in admin " + new Date().toISOString().slice(0, 10) });
+  } else if (b.action === "update") {
+    if (!id) return json({ error: "Missing location" }, 400);
+    if ("name" in f && !f.name) delete f.name;
+    if ("city" in f && !f.city) delete f.city;
+    const r = rowOf(id);
+    if (r) await writeRow(sheet, r._row, f);
+    else { const bs = base.find((x) => x.id === id); if (!bs) return json({ error: "Location not found" }, 404); await writeRow(sheet, null, { ...Object.fromEntries(Object.entries(bs).filter(([k]) => k !== "id")), ...f, id }); }
+  } else if (b.action === "remove" || b.action === "restore") {
+    const r = rowOf(id), v = b.action === "remove" ? "yes" : "";
+    if (r) await writeRow(sheet, r._row, { hidden: v });
+    else if (base.some((x) => x.id === id)) await writeRow(sheet, null, { id, name: base.find((x) => x.id === id).name, hidden: v });
+  } else return json({ error: "Unknown action" }, 400);
+  return json({ ok: true, data: await sheetData(req, true) });
+}
+
 export default async (req) => {
   try {
-    const s = store();
-    if (req.method === "GET") return json({ ...EMPTY, ...((await s.get("data", { type: "json" })) || {}) });
+    if (req.method === "GET") {
+      if (sheetOn()) return new Response(JSON.stringify(await sheetData(req)), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      const s = store();
+      return json({ ...EMPTY, ...((await s.get("data", { type: "json" })) || {}) });
+    }
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    const s = store();
     const b = await req.json().catch(() => ({}));
     // First visit, nothing set yet: the admin page asks him to create a passcode.
     if (b.action === "status") return json({ setup: !(await auth(s)) && !process.env.ADMIN_CODE });
@@ -66,6 +110,7 @@ export default async (req) => {
       await setCode(s, n);
       return json({ ok: true });
     }
+    if (sheetOn()) return await sheetAction(req, b);
     const d = { ...EMPTY, ...((await s.get("data", { type: "json" })) || {}) };
     const id = clean(b.id, 80), f = fields(b.fields || {});
     if (b.action === "add") {
@@ -86,7 +131,9 @@ export default async (req) => {
     await s.setJSON("data", d);
     return json({ ok: true, data: d });
   } catch (e) {
-    return json({ error: "Something went wrong. Try again." }, 500);
+    console.error(e);
+    if (sheetOn() && req.method === "GET") return json(EMPTY); // the site still shows its built list if the Sheet can't be reached
+    return json({ error: /Google/.test(e.message) ? e.message : "Something went wrong. Try again." }, 500);
   }
 };
 export const config = { path: "/api/data" };
