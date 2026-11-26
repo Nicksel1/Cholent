@@ -29,7 +29,8 @@ function shape(e) {
   const clean = e.title.replace(/\p{Extended_Pictographic}/gu, "").replace(/[⁠-⁯️]/g, "").replace(/📍.*$/u, "").trim();
   const name = (clean.split(/:\s*|Ep\.?\s*\d+\s*[-–:]?\s*/i).pop() || clean).trim().slice(0, 70);
   const rate = /(?:final rating|rating|ציון)[^\d]{0,14}(\d{1,2}(?:\.\d)?)/i.exec(e.desc);
-  const loc = /(?:location|מיקום)\s*:?\s*([^\n]+)/i.exec(e.desc);
+  // "Location: ...", "מיקום: ...", "Address: ..." or a line that starts with 📍 (with or without a word after it)
+  const loc = /(?:location|address|מיקום|כתובת)\s*[:：]\s*([^\n]+)/i.exec(e.desc) || /📍\s*(?:location|address|מיקום|כתובת)?\s*[:：]?\s*([^\n]+)/iu.exec(e.desc);
   const score = rate && +rate[1] <= 10 ? +rate[1] : null;
   return { id: e.id, name, place: loc ? loc[1].split(",").pop().trim().slice(0, 40) : "", score, date: e.date, visited: visitDate(e.desc) };
 }
