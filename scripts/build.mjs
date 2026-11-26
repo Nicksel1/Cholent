@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { REVIEWS, VISITS } from "../src/data/reviews.mjs";
 import { NAMES_EN, autoEn } from "../src/data/names-en.mjs";
+import { syncVideos } from "./youtube.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const SRC = path.join(ROOT, "src");
@@ -69,8 +70,10 @@ const HE_CITY = {
 };
 const CITY_HE = Object.fromEntries(Object.entries(HE_CITY).map(([h, e]) => [e, h]));
 const listings = JSON.parse(fs.readFileSync(path.join(SRC, "data/listings.json"), "utf8"));
-const rawVideos = JSON.parse(fs.readFileSync(path.join(SRC, "data/videos-raw.json"), "utf8"));
-const vidMeta = Object.fromEntries(rawVideos.map((v) => [v.id, v]));
+// The channel's videos: read fresh from YouTube when YOUTUBE_API_KEY is set, otherwise the saved list.
+const savedVideos = JSON.parse(fs.readFileSync(path.join(SRC, "data/videos-raw.json"), "utf8"));
+const rawVideos = await syncVideos(savedVideos);
+const vidMeta = Object.fromEntries([...savedVideos, ...rawVideos].map((v) => [v.id, v])); // fresh data wins
 const isVertical = (id) => vidMeta[id] ? vidMeta[id].short !== false : true;
 const thumb = (id) => fs.existsSync(path.join(SRC, "img/ep", id + ".webp")) ? `/img/ep/${id}.webp` : null;
 
@@ -271,7 +274,7 @@ const clientSpot = (s) => ({
 const H1 = "Where are you eating tonight?";
 const nextThu = (() => { const d = new Date(); d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7)); return d; })();
 const thuStr = nextThu.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-const eps = rawVideos.filter((v) => !/^October|^Taste Testing|^We tried making/.test(v.title) && v.id !== "46rbDy-FkVA").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
+const eps = rawVideos.filter((v) => !/^Taste Testing|^We tried making/.test(v.title) && v.id !== "46rbDy-FkVA").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
 const revByVideo = Object.fromEntries([...REVIEWS, ...VISITS].map((r) => [r.video, r]));
 const ymd = (d) => fmtDate(d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6));
 

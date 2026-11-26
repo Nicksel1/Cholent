@@ -30,3 +30,18 @@ Storage for the admin page is Netlify Blobs, which is built in.
 ## Note
 
 `index.html` in this folder is the old "coming soon" page. GitHub Pages still serves it. Netlify ignores it and serves the built site from `dist/`.
+
+## YouTube sync (weekly)
+
+The Reviews strip and the review dates use the channel's videos. With `YOUTUBE_API_KEY` set in Netlify
+(a Google Cloud API key restricted to "YouTube Data API v3"), every build reads the whole channel fresh:
+titles, descriptions and upload dates, so edits made on YouTube show after the next build.
+Without the key the saved list in `src/data/videos-raw.json` is used. Code: `scripts/youtube.mjs`.
+
+A review's date is the filming date written in its video's description (e.g. "February 5th, 2025" or
+"5.2.2025"), otherwise the upload date.
+
+`netlify/functions/weekly-rebuild.mjs` rebuilds the site every Thursday at 12:00 UTC (2 PM Israel in winter,
+3 PM in summer). It needs `BUILD_HOOK_URL` in Netlify (Site configuration → Build & deploy → Build hooks).
+New uploads don't wait for it: "This week's episode" and the start of the Reviews strip check YouTube's feed
+about every 30 minutes.
