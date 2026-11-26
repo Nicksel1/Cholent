@@ -216,6 +216,16 @@ ${links.filter(([k]) => k !== "#about").map(([k, t]) => `<a href="${h}${k}">${t}
 </div></header>`;
 };
 
+// List picture: a rated spot (filmed) shows the episode thumbnail; an unrated one shows its Google Maps photo.
+// If an unrated spot has no Google listing but has a video, the video thumbnail is used instead.
+const rowPhoto = (s) => {
+  const ytImg = s.video ? (s.img || `https://i.ytimg.com/vi/${s.video}/hqdefault.jpg`) : "";
+  const img = (src) => `<span class="ph"><img src="${src}" alt="" loading="lazy" decoding="async" width="64" height="64"></span>`;
+  if (s.score != null && ytImg) return img(ytImg);
+  if (s.placeId) return `<span class="ph" data-pid="${s.placeId}"><span class="tile" aria-hidden="true">${esc(initial(s))}</span></span>`;
+  if (ytImg) return img(ytImg);
+  return `<span class="ph"><span class="tile" aria-hidden="true">${esc(initial(s))}</span></span>`;
+};
 const footer = () => `<footer class="ftr"><div class="wrap">
 <div><a class="logo" href="/">Cholent <span class="amp">&amp;</span> Chill</a></div>
 <div><p class="fh">Cities</p><ul>${CITY_PAGES.slice(0, 6).map((c) => `<li><a href="/cities/${citySlug(c)}/">${esc(c)}</a></li>`).join("")}</ul></div>
@@ -232,7 +242,7 @@ const nameHtml = (s) => s.en ? `<span class="en">${esc(s.en)}</span>` : `<span l
 const sub = (s) => [s.cityLabel, DAYS[s.days] || s.days].filter(Boolean).join(" · ");
 
 const row = (s) => `<li class="row" data-id="${s.id}"><a href="${s.url}">
-<span class="ph"${s.placeId ? ` data-pid="${s.placeId}"` : ""}>${s.real ? `<img src="${s.img}" alt="" loading="lazy" decoding="async" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(initial(s))}</span>`}</span>
+${rowPhoto(s)}
 <span class="nm"><strong>${nameHtml(s)}</strong><span class="sub">${esc(sub(s))}</span>${s.kosher ? `<span class="k" lang="${hasHe(s.kosher) ? "he" : "en"}">${esc(s.kosher)}</span>` : ""}</span>
 <span class="side">${s.score != null ? stamp(s.score, "sm") : s.video ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span>
 </a></li>`;
