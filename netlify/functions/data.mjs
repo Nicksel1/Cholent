@@ -2,7 +2,7 @@
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
 
-const EMPTY = { added: [], edits: {}, hidden: [] };
+const EMPTY = { added: [], edits: {}, hidden: [], videos: [] }; // videos: YouTube ids hidden from the website
 const store = () => getStore({ name: "cholent-chill", consistency: "strong" });
 const hash = (code, salt) => crypto.scryptSync(String(code), salt, 32).toString("hex");
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -40,7 +40,14 @@ function fields(b) {
   if (has("video")) o.video = (/(?:v=|shorts\/|youtu\.be\/|embed\/)([\w-]{11})/.exec(clean(b.video, 200)) || /^([\w-]{11})$/.exec(clean(b.video, 20)) || [])[1] || "";
   if (has("ep")) o.ep = clean(b.ep, 30);
   if (has("price")) o.price = clean(b.price, 80);
+  if (has("closed")) o.closed = b.closed === true || b.closed === "true" || b.closed === "on";
   return o;
+}
+
+async function rebuild() {
+  const hook = process.env.BUILD_HOOK_URL;
+  if (!hook) return;
+  try { await fetch(hook, { method: "POST" }); } catch (_) {}
 }
 
 export default async (req) => {
@@ -82,8 +89,16 @@ export default async (req) => {
       else if (id && !d.hidden.includes(id)) d.hidden.push(id);
     } else if (b.action === "restore") {
       d.hidden = d.hidden.filter((x) => x !== id);
+    } else if (b.action === "hideVideo" || b.action === "showVideo") {
+      const v = (/(?:v=|shorts\/|youtu\.be\/|embed\/)([\w-]{11})/.exec(clean(b.video, 200)) || /^([\w-]{11})$/.exec(clean(b.video, 20)) || [])[1];
+      if (!v) return json({ error: "That doesn't look like a YouTube link" }, 400);
+      d.videos = (d.videos || []).filter((x) => x !== v);
+      if (b.action === "hideVideo") d.videos.unshift(v);
     } else return json({ error: "Unknown action" }, 400);
     await s.setJSON("data", d);
+    // Closing a spot or hiding a video changes "This week's episode", Top rated and the map, which are built
+    // into the pages. Ask Netlify to rebuild so it's fully applied in about a minute.
+    if (b.action === "hideVideo" || b.action === "showVideo" || "closed" in f) await rebuild();
     return json({ ok: true, data: d });
   } catch (e) {
     return json({ error: "Something went wrong. Try again." }, 500);

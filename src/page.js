@@ -76,6 +76,11 @@
     }
     const f = (d.edits || {})[sid];
     if (!f) return;
+    if ("closed" in f) {
+      const old = document.querySelector(".closed-banner");
+      if (f.closed && !old) document.querySelector("#main")?.insertAdjacentHTML("afterbegin", '<div class="closed-banner" role="alert"><div class="wrap"><strong>Closed</strong><span>This place is no longer open. Please don\'t go there.</span></div></div>');
+      if (!f.closed && old) old.remove();
+    }
     const DAYS = { "Thursday": "Thu night", "Thu & Fri": "Thu–Fri", "Wed-Fri": "Wed–Fri", "All Week": "All week" };
     const dl = $(".spot .facts");
     const set = (label, val, html) => {

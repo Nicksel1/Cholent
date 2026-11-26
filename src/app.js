@@ -222,7 +222,7 @@
       if (q && !q.split(/\s+/).every((w) => fuzzy(s.i, w))) pass = false;
       if (state.city === "__none" ? s.a : state.city && s.c !== state.city) pass = false;
       if (state.rated && s.s == null) pass = false;
-      if (state.tonight && !openTonight(s.d)) pass = false;
+      if (state.tonight && (!openTonight(s.d) || s.cl)) pass = false;
       if (pass) ok.add(s.i);
     }
     let ids = order0.slice();
@@ -334,7 +334,7 @@
   }
   function updateMarkers(vis, fit) {
     if (!map) return;
-    const want = vis.filter((s) => markers[s.i]).map((s) => markers[s.i]);
+    const want = vis.filter((s) => markers[s.i] && !s.cl).map((s) => markers[s.i]); // closed spots stay off the map
     cluster.clearLayers();
     cluster.addLayers(want);
     if (fit && want.length) {
@@ -460,14 +460,14 @@ ${s.u ? `<a class="more-link" href="${s.u}">Full page →</a>` : ""}`;
   const yt = (id, k = "hqdefault") => `https://i.ytimg.com/vi/${id}/${k}.jpg`;
   function rowEl(x) {
     const li = document.createElement("li");
-    li.className = "row"; li.dataset.id = x.i;
+    li.className = "row" + (x.cl ? " closed" : ""); li.dataset.id = x.i;
     // rated (filmed): episode thumbnail. Not rated: Google Maps photo, or the video if there's no Google listing.
     const vimg = x.v ? (x.im || yt(x.v)) : "";
     const pid = (x.s != null && vimg) ? "" : x.pid;
     const img = pid ? "" : vimg;
     li.innerHTML = `<a href="${x.u || x.g}"${x.u ? "" : ' target="_blank" rel="noopener"'}><span class="ph"${pid ? ` data-pid="${pid}"` : ""}>${img ? `<img src="${img}" alt="" loading="lazy" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(x.l)}</span>`}</span>
 <span class="nm"><strong>${x.e ? `<span class="en">${esc(x.e)}</span>` : `<span lang="he" dir="rtl">${esc(x.n)}</span>`}</strong><span class="sub">${esc(x.c)} · ${esc(DAYS[x.d] || x.d)}</span></span>
-<span class="side">${x.s != null ? `<span class="stamp sm ${x.s >= 9 ? "top" : ""}">${x.s.toFixed(1)}<small>/10</small></span>` : x.v ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span></a>`;
+<span class="side">${x.cl ? '<span class="tag closed-tag">Closed</span>' : ""}${x.s != null ? `<span class="stamp sm ${x.s >= 9 ? "top" : ""}">${x.s.toFixed(1)}<small>/10</small></span>` : x.v ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span></a>`;
     return li;
   }
   function links(x, name) {
@@ -493,6 +493,7 @@ ${s.u ? `<a class="more-link" href="${s.u}">Full page →</a>` : ""}`;
     if (has("video")) { if (f.video !== x.v) x.im = ""; x.v = f.video || null; x.vv = true; }
     if (has("ep")) x.ep = f.ep;
     if (has("price")) x.pr = f.price;
+    if (has("closed")) x.cl = f.closed ? 1 : 0;
     x.l = (x.e || x.n).replace(/^(ה|the\s)/i, "").trim().charAt(0).toUpperCase();
     links(x, x.h || x.n);
     hay[x.i] = norm([x.n, x.e, x.h, x.al, x.c, x.ch, x.a, x.k].join(" "));
@@ -501,7 +502,7 @@ ${s.u ? `<a class="more-link" href="${s.u}">Full page →</a>` : ""}`;
   function renderTops() {
     const ol = $("#tops, #tops-car");
     if (!ol) return;
-    const ranked = SPOTS.filter((s) => s.s != null).sort((a, b) => b.s - a.s);
+    const ranked = SPOTS.filter((s) => s.s != null && !s.cl).sort((a, b) => b.s - a.s);
     const open = ol.classList.contains("all");
     ol.innerHTML = ranked.map((s, i) => `<li class="top-card in${i >= 8 ? " more" : i >= 4 ? " more-m" : ""}"><a href="${s.u || s.g}"${s.u ? "" : ' target="_blank" rel="noopener"'}>
 <span class="ph"><img src="${s.im || (s.v ? yt(s.v, "oar2") : "")}" alt="" loading="lazy" width="480" height="600"${s.v ? ` onerror="this.onerror=null;this.src='${yt(s.v)}'"` : ""}><span class="rank">${i + 1}</span><span class="stamp ${s.s >= 9 ? "top" : ""}">${s.s.toFixed(1)}<small>/10</small></span></span>
@@ -535,7 +536,7 @@ ${s.u ? `<a class="more-link" href="${s.u}">Full page →</a>` : ""}`;
     }
     // rated first by score, then the rest in their existing order
     const pos = Object.fromEntries(order0.map((id, k) => [id, k]));
-    order0.sort((a, b) => (byId[b].s ?? -1) - (byId[a].s ?? -1) || pos[a] - pos[b]);
+    order0.sort((a, b) => (byId[a].cl || 0) - (byId[b].cl || 0) || (byId[b].s ?? -1) - (byId[a].s ?? -1) || pos[a] - pos[b]);
     apply.moved = true;
     apply(false);
     renderTops();

@@ -26,6 +26,14 @@ body{background:var(--cream)}
 .found b{display:block;font-size:15px}
 .found button{margin-left:auto;flex:none}
 .pin-field{margin-top:4px}
+.closed-box{display:flex;gap:12px;align-items:flex-start;border:2px solid #d0021b;border-radius:12px;padding:12px 14px;cursor:pointer}
+.closed-box input{width:22px;height:22px;margin-top:2px;accent-color:#d0021b;flex:none}
+.closed-box b{display:block;color:#d0021b}
+.closed-box span{font-size:14px;opacity:.8}
+.vlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vlist li{display:flex;gap:10px;align-items:center;background:var(--cream);border-radius:12px;padding:8px}
+.vlist img{width:64px;height:48px;object-fit:cover;border-radius:8px;flex:none}
+.vlist a{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .pin-map{height:280px;border-radius:12px;overflow:hidden;background:var(--cream);border:1px solid rgba(0,0,0,.12)}
 .pin-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;margin-top:6px;opacity:.8}
 .pin-row button{margin-left:auto}
@@ -101,6 +109,7 @@ body{background:var(--cream)}
 <div class="f"><label for="a-kosher">Kashrut</label><input id="a-kosher" autocomplete="off"></div>
 <div class="f"><label for="a-phone">Phone</label><input id="a-phone" inputmode="tel" autocomplete="off"></div>
 </div>
+<label class="closed-box"><input type="checkbox" id="a-closed"><div><b>Closed (out of business)</b><span>Shows a red "Closed" banner on its page, takes it off the map, Top rated and "Open tonight", and keeps its video out of "This week's episode" and the Reviews strip.</span></div></label>
 <p class="sub-h">Review <span class="opt" style="font:500 13px var(--f-body)">optional</span></p>
 <div class="f2">
 <div class="f"><label for="a-score">Score <span class="opt">out of 10</span></label><input id="a-score" inputmode="decimal" placeholder="8.5"></div>
@@ -137,6 +146,14 @@ body{background:var(--cream)}
 <!-- settings -->
 <div data-pane="settings" hidden>
 <h1>Settings</h1>
+<form class="card" id="vidf" novalidate>
+<p class="sub-h">Hidden videos</p>
+<p style="margin:0;font-size:14px;opacity:.8">Videos on this list never appear on the website (not in "This week's episode", not in the Reviews strip). Nothing changes on YouTube.</p>
+<div class="f"><label for="v-link">YouTube link</label><input id="v-link" inputmode="url" autocomplete="off" placeholder="https://youtube.com/shorts/..."></div>
+<p class="msg" id="vid-msg"></p>
+<button class="btn wide" type="submit">Hide this video</button>
+<ul class="vlist" id="vlist"></ul>
+</form>
 <form class="card" id="passf" novalidate>
 <p class="sub-h">Change passcode</p>
 <div class="f"><label for="p-new">New passcode <span class="opt">at least 4 characters</span></label><input id="p-new" type="password" autocomplete="new-password"></div>
@@ -204,6 +221,7 @@ body{background:var(--cream)}
     all.sort((a, b) => (a.off ? 1 : 0) - (b.off ? 1 : 0) || (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.score ?? -1) - (a.score ?? -1));
     $("#a-cities").innerHTML = [...new Set(all.map((x) => x.city).filter(Boolean))].sort().map((c) => `<option value="${esc(c)}">`).join("");
     renderList();
+    renderVideos();
   }
   async function load() {
     [base, data] = await Promise.all([
@@ -212,12 +230,31 @@ body{background:var(--cream)}
     ]);
     merge();
   }
+  function renderVideos() {
+    const ids = data.videos || [];
+    $("#vlist").innerHTML = ids.length ? ids.map((v) => `<li><img src="https://i.ytimg.com/vi/${v}/hqdefault.jpg" alt=""><a href="https://youtu.be/${v}" target="_blank" rel="noopener">youtu.be/${v}</a><button class="btn ghost sm" type="button" data-show="${v}">Show again</button></li>`).join("") : '<li style="background:none;padding:0;font-size:14px;opacity:.7">No hidden videos.</li>';
+  }
+  $("#vidf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const link = $("#v-link").value.trim();
+    if (!link) return $("#v-link").focus();
+    const r = await post({ action: "hideVideo", video: link });
+    if (!r.ok) return say($("#vid-msg"), r.data.error || "Couldn't save. Try again.", "err");
+    data = r.data.data; merge(); $("#v-link").value = "";
+    say($("#vid-msg"), "Hidden. The site updates in about a minute.", "ok");
+  });
+  $("#vlist").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-show]");
+    if (!b) return;
+    const r = await post({ action: "showVideo", video: b.dataset.show });
+    if (r.ok) { data = r.data.data; merge(); say($("#vid-msg"), "Shown again. The site updates in about a minute.", "ok"); }
+  });
   const label = (x) => x.nameEn && x.nameEn !== x.name ? `${x.nameEn} · ${x.name}` : x.name;
   function renderList() {
     const q = norm($("#ls").value.trim());
     const rows = all.filter((x) => !q || norm([x.name, x.nameEn, x.city, x.address].join(" ")).includes(q));
     $("#lcount").textContent = `${rows.length} location${rows.length === 1 ? "" : "s"}`;
-    $("#litems").innerHTML = rows.slice(0, limit).map((x) => `<li class="${x.off ? "off" : ""}"><div class="t"><strong>${esc(label(x))}</strong><span>${esc(x.city || "No city")}${x.own ? " · added here" : ""}${x.off ? " · removed" : ""}</span></div>${x.score != null ? `<span class="sc">${Number(x.score).toFixed(1)}</span>` : ""}${x.off ? `<button class="btn ghost sm" type="button" data-restore="${x.id}">Restore</button>` : `<button class="btn ghost sm" type="button" data-edit="${x.id}">Edit</button>`}</li>`).join("");
+    $("#litems").innerHTML = rows.slice(0, limit).map((x) => `<li class="${x.off ? "off" : ""}"><div class="t"><strong>${esc(label(x))}</strong><span>${esc(x.city || "No city")}${x.own ? " · added here" : ""}${x.off ? " · removed" : ""}${x.closed ? " · CLOSED" : ""}</span></div>${x.score != null ? `<span class="sc">${Number(x.score).toFixed(1)}</span>` : ""}${x.off ? `<button class="btn ghost sm" type="button" data-restore="${x.id}">Restore</button>` : `<button class="btn ghost sm" type="button" data-edit="${x.id}">Edit</button>`}</li>`).join("");
     $("#lmore").hidden = rows.length <= limit;
   }
   $("#ls").addEventListener("input", () => { limit = 30; renderList(); });
@@ -242,6 +279,7 @@ body{background:var(--cream)}
     editing = x; place = null; $("#found").hidden = true; say($("#loc-msg"), ""); say($("#find-msg"), "");
     $("#locf").reset();
     if (x) for (const [k, sel] of Object.entries(F)) $(sel).value = k === "video" && x.video ? "https://youtu.be/" + x.video : x[k] ?? (k === "days" ? "Thursday" : "");
+    $("#a-closed").checked = !!x?.closed;
     $("#form-title").textContent = x ? "Edit location" : "Add a location";
     $("#save").textContent = x ? "Save changes" : "Add location";
     $("#cancel").hidden = !x; $("#remove").hidden = !x;
@@ -262,6 +300,7 @@ body{background:var(--cream)}
     const m = $("#loc-msg"); say(m, "");
     const f = {};
     for (const [k, sel] of Object.entries(F)) f[k] = $(sel).value.trim();
+    if ($("#a-closed").checked || editing?.closed) f.closed = $("#a-closed").checked;
     if (!f.name) { $("#a-name").focus(); return; }
     if (!f.city) { $("#a-city").focus(); return; }
     if (place) Object.assign(f, place);
