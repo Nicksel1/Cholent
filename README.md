@@ -45,3 +45,22 @@ A review's date is the filming date written in its video's description (e.g. "Fe
 3 PM in summer). It needs `BUILD_HOOK_URL` in Netlify (Site configuration → Build & deploy → Build hooks).
 New uploads don't wait for it: "This week's episode" and the start of the Reviews strip check YouTube's feed
 about every 30 minutes.
+
+## Locations from YouTube (automatic)
+
+Every build reads the channel (see "YouTube sync") and turns rated videos into locations. A video counts when
+its description has a rating and a location, for example:
+
+    📍 Location: HaRav Kook 12, Jerusalem
+    Final rating: 9.2/10
+
+Optional lines: `Verdict: ...`, `Kashrut: ...`, `Price: ...`. Hebrew works too (`📍 רבי עקיבא 19, ביתר עילית`, `ציון: 8.5/10`).
+The map pin comes from Google (using the address); these spots show "from YouTube, check the pin" in `/admin`.
+
+Existing spots are never overwritten. A video that already belongs to a spot is skipped. A video matching an
+existing spot (same name, same street and number, same Google place, or a rated spot within 50 m, or within 300 m
+with the same score) only adds a rating to a spot that has none. Hidden videos are skipped.
+
+The 30-minute YouTube check (`/api/latest`) starts a rebuild when it sees a new rated video that isn't a location
+yet, at most once every 6 hours. `/admin` → Settings → "Update from YouTube now" rebuilds right away.
+Code: `scripts/auto-spots.mjs`.

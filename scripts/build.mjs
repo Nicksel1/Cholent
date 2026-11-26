@@ -5,6 +5,7 @@ import path from "node:path";
 import { REVIEWS, VISITS } from "../src/data/reviews.mjs";
 import { NAMES_EN, autoEn } from "../src/data/names-en.mjs";
 import { syncVideos } from "./youtube.mjs";
+import { autoSpots } from "./auto-spots.mjs";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const SRC = path.join(ROOT, "src");
@@ -75,7 +76,9 @@ const savedVideos = JSON.parse(fs.readFileSync(path.join(SRC, "data/videos-raw.j
 const rawVideos = await syncVideos(savedVideos);
 const vidMeta = Object.fromEntries([...savedVideos, ...rawVideos].map((v) => [v.id, v])); // fresh data wins
 const isVertical = (id) => vidMeta[id] ? vidMeta[id].short !== false : true;
-const thumb = (id) => fs.existsSync(path.join(SRC, "img/ep", id + ".webp")) ? `/img/ep/${id}.webp` : null;
+const localThumb = (id) => fs.existsSync(path.join(SRC, "img/ep", id + ".webp")) ? `/img/ep/${id}.webp` : null;
+// Saved thumbnail if there is one, otherwise YouTube's own (new videos don't have a saved one).
+const thumb = (id) => id ? localThumb(id) || `https://i.ytimg.com/vi/${id}/${vidMeta[id]?.short === false ? "hqdefault" : "oar2"}.jpg` : null;
 
 // ---------- review dates ----------
 // A review's date is the day written in its video's description (when there is one), otherwise the upload date.
@@ -133,12 +136,49 @@ for (const [kind, arr] of [["review", REVIEWS], ["visit", VISITS]]) {
   }
 }
 
+// ---------- closed spots and hidden videos (set in the admin page) ----------
+// Read from the live site's admin data when the site is built. If it can't be read, nothing is closed or hidden.
+let admin = { edits: {}, videos: [] };
+const ADMIN_URL = process.env.ADMIN_DATA_URL || (process.env.URL ? process.env.URL.replace(/\/$/, "") + "/api/data" : "");
+if (ADMIN_URL) {
+  try { admin = { ...admin, ...(await (await fetch(ADMIN_URL, { signal: AbortSignal.timeout(10000) })).json()) }; }
+  catch (e) { console.log("Admin data not reachable at build time:", e.message); }
+}
+const HIDDEN_VIDEOS = new Set(admin.videos || []);
+
+// ---------- locations from rated YouTube videos ----------
+// A video whose description has "Final rating: X/10" and "Location: ..." becomes a location (see scripts/auto-spots.mjs).
+async function geocode(q) {
+  if (!GKEY) return null;
+  const u = "https://maps.googleapis.com/maps/api/place/textsearch/json?" + new URLSearchParams({ query: q, language: "he", region: "il", key: GKEY });
+  const x = (await (await fetch(u, { signal: AbortSignal.timeout(10000) })).json()).results?.[0];
+  return x ? { lat: +x.geometry.location.lat.toFixed(5), lng: +x.geometry.location.lng.toFixed(5), placeId: x.place_id } : null;
+}
+const cityOf = (addr, fallback) => { const tail = String(addr).split(",").pop().trim(); return HE_CITY[tail] || tail || fallback; };
+try {
+  const auto = await autoSpots({ videos: rawVideos, spots, skip: (id) => HIDDEN_VIDEOS.has(id), geocode, cityOf, visitOf });
+  for (const { review: r, spot } of auto.added) {
+    REVIEWS.push(r);
+    let s = spot;
+    if (!s) { s = { num: null, nums: [], name: r.name, city: r.place, days: "Thursday", kosher: r.kosher || "", phone: "" }; spots.push(s); }
+    if (!s.en && !hasHe(r.name)) s.en = r.name;
+    if (!s.lat && r.lat) { s.lat = r.lat; s.lng = r.lng; s.autoPin = true; }
+    if (!s.placeId && r.placeId) s.placeId = r.placeId;
+    if (!s.address && r.address) s.address = r.address;
+    if (!s.city && r.place) s.city = r.place;
+    if (!s.kosher && r.kosher) s.kosher = r.kosher;
+    s.review = { ...r, kind: "review" };
+    s.auto = true;
+  }
+  if (auto.added.length) console.log(`Locations from YouTube: ${auto.added.length} (${auto.added.filter((a) => !a.spot).length} new, ${auto.added.filter((a) => a.spot).length} existing spots got a rating)`);
+} catch (e) { console.log("Couldn't add locations from YouTube:", e.message); }
+
 const missingEn = [];
 // ids and display
 const used = new Set();
 for (const s of spots) {
   const cityPart = slug(s.city || "israel");
-  let id = s.en ? slug(s.en) + (s.en && s.city && !slug(s.en).includes(cityPart) ? "-" + cityPart : "") : `${cityPart}-${s.nums[0]}`;
+  let id = s.en && slug(s.en) ? slug(s.en) + (s.en && s.city && !slug(s.en).includes(cityPart) ? "-" + cityPart : "") : s.nums.length ? `${cityPart}-${s.nums[0]}` : `${cityPart}-${(s.review?.id || "spot").replace(/^yt-/, "").toLowerCase()}`;
   while (used.has(id)) id += "-2";
   used.add(id);
   s.id = id;
@@ -146,7 +186,7 @@ for (const s of spots) {
   s.score = s.review?.kind === "review" ? s.review.score : null;
   s.video = s.review?.video || null;
   s.img = (s.video && thumb(s.video)) || "";
-  s.real = !!(s.video && thumb(s.video));
+  s.real = !!s.img;
   s.cityLabel = s.city || "Israel";
   s.display = s.en || s.name;
   s.he = hasHe(s.name) ? s.name : "";
@@ -161,15 +201,7 @@ const gmapsUrl = (s) => s.placeId
   ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.he || s.name)}&query_place_id=${s.placeId}`
   : s.lat ? `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q(s) + " Israel")}`;
 
-// ---------- closed spots and hidden videos (set in the admin page) ----------
-// Read from the live site's admin data when the site is built. If it can't be read, nothing is closed or hidden.
-let admin = { edits: {}, videos: [] };
-const ADMIN_URL = process.env.ADMIN_DATA_URL || (process.env.URL ? process.env.URL.replace(/\/$/, "") + "/api/data" : "");
-if (ADMIN_URL) {
-  try { admin = { ...admin, ...(await (await fetch(ADMIN_URL, { signal: AbortSignal.timeout(10000) })).json()) }; }
-  catch (e) { console.log("Admin data not reachable at build time:", e.message); }
-}
-const HIDDEN_VIDEOS = new Set(admin.videos || []);
+// ---------- closed spots (admin data and hidden videos are read further up) ----------
 for (const s of spots) s.closed = !!(admin.edits || {})[s.id]?.closed;
 const CLOSED_VIDEOS = new Set(spots.filter((s) => s.closed && s.video).map((s) => s.video));
 const offSite = (id) => !!id && (HIDDEN_VIDEOS.has(id) || CLOSED_VIDEOS.has(id)); // never "this week's episode" or in the Reviews strip
@@ -707,7 +739,7 @@ write("404.html", head({ title: "Not found | Cholent & Chill", desc: "This page 
 const urls = ["/", ...CITY_PAGES.map((c) => `/cities/${citySlug(c)}/`), ...spots.map((s) => s.url)];
 write("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `<url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
 write("robots.txt", INDEX ? `User-agent: *\nAllow: /\nSitemap: ${SITE}/sitemap.xml\n` : "User-agent: *\nDisallow: /\n");
-write("data/spots.json", JSON.stringify(spots.map((s) => ({ id: s.id, name: s.name, nameEn: s.en || "", city: s.city || "", address: s.address || "", days: s.days, kosher: s.kosher || "", phone: s.phone || "", lat: s.lat ?? null, lng: s.lng ?? null, placeId: s.placeId || "", score: s.score, verdict: s.review?.verdict || "", video: s.video || "", ep: s.review?.ep || "", price: s.review?.price || "" }))));
+write("data/spots.json", JSON.stringify(spots.map((s) => ({ id: s.id, auto: s.auto ? (s.autoPin ? "pin" : "yes") : undefined, name: s.name, nameEn: s.en || "", city: s.city || "", address: s.address || "", days: s.days, kosher: s.kosher || "", phone: s.phone || "", lat: s.lat ?? null, lng: s.lng ?? null, placeId: s.placeId || "", score: s.score, verdict: s.review?.verdict || "", video: s.video || "", ep: s.review?.ep || "", price: s.review?.price || "" }))));
 write("og-list.json", JSON.stringify({ site: { total, rated }, spots: spots.filter((s) => s.score != null).map((s) => ({ id: s.id, name: s.display, place: s.cityLabel, score: s.score, img: s.img, verdict: s.review.verdict })) }));
 
 if (missingEn.length) console.log(`No English spelling yet (automatic one used): ${missingEn.join(", ")}`);
