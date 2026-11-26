@@ -1,5 +1,6 @@
 // Builds the static site into dist/. No dependencies. Run: node scripts/build.mjs
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { REVIEWS, VISITS } from "../src/data/reviews.mjs";
 import { NAMES_EN, autoEn } from "../src/data/names-en.mjs";
@@ -152,7 +153,21 @@ const ranked = REVIEWS.slice().sort((a, b) => b.score - a.score || b.date.locale
 const spotFor = (r) => spots.find((s) => s.review && s.review.id === r.id);
 const rated = spots.filter((s) => s.score != null).length;
 const total = spots.length;
-const latest = REVIEWS.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.ep ? 1 : 0) - (a.ep ? 1 : 0))[0];
+let latest = REVIEWS.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.ep ? 1 : 0) - (a.ep ? 1 : 0))[0];
+// "This week's episode": ask the YouTube feed at build time, so the page is built with the newest
+// episode and doesn't swap the picture after it loads. Uses the same reader as /api/latest.
+// If YouTube can't be reached, the newest review above is used, as before.
+try {
+  const feed = await Promise.race([
+    new Promise((ok) => createRequire(import.meta.url)("../api/latest.js")({}, { setHeader() {}, status() { return this; }, json: ok })),
+    new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000)),
+  ]);
+  if (feed?.id && feed.id !== latest.video) {
+    const known = [...REVIEWS, ...VISITS].find((r) => r.video === feed.id);
+    latest = known ? { ...known, score: known.score ?? null } : { video: feed.id, name: feed.name, place: feed.place, score: feed.score ?? null };
+  }
+} catch (e) { console.log("YouTube feed not reachable at build time, using the newest review:", e.message); }
+const heroThumb = (id) => thumb(id) || `https://i.ytimg.com/vi/${id}/oar2.jpg`;
 
 // ---------- shared markup ----------
 const FONTS = "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800;900&family=Suez+One&family=Ultra&display=swap";
@@ -238,7 +253,7 @@ const revByVideo = Object.fromEntries([...REVIEWS, ...VISITS].map((r) => [r.vide
 const ymd = (d) => fmtDate(d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6));
 
 const weekCard = () => `<button class="week" type="button" data-yt="${latest.video}" data-vertical="${isVertical(latest.video)}">
-<span class="week-thumb"><img src="${thumb(latest.video)}" alt="" width="86" height="134"><span class="play"><span>${ICON.play}</span></span></span>
+<span class="week-thumb"><img src="${heroThumb(latest.video)}" alt="" width="86" height="134"><span class="play"><span>${ICON.play}</span></span></span>
 <span class="week-body"><span class="label">This week's episode</span><strong>${esc(latest.name)}</strong><span class="meta">${esc(latest.place)}</span></span>
 ${stamp(latest.score)}
 </button>`;
@@ -381,7 +396,7 @@ Object.assign(SEC, {
 <h1 class="vh">${H1}</h1>
 <a class="inf-lead" href="#top-rated"><span class="ph"><img src="/img/mock/table-1800.webp" alt="" fetchpriority="high" width="1800" height="771"></span><strong>The ${ranked.length} best cholents in Israel</strong></a>
 <div class="inf-side">
-<button class="inf-card" type="button" data-yt="${latest.video}" data-vertical="${isVertical(latest.video)}"><span class="ph"><img src="${thumb(latest.video)}" alt="" width="480" height="600"><span class="play"><span>${ICON.play}</span></span></span><strong>This week: ${esc(latest.name)}</strong></button>
+<button class="inf-card" type="button" data-yt="${latest.video}" data-vertical="${isVertical(latest.video)}"><span class="ph"><img src="${heroThumb(latest.video)}" alt="" width="480" height="600"><span class="play"><span>${ICON.play}</span></span></span><strong>This week: ${esc(latest.name)}</strong></button>
 <a class="inf-card" href="/cities/beit-shemesh/"><span class="ph"><img src="${cityTop("Beit Shemesh")?.img}" alt="" loading="lazy" width="480" height="600"></span><strong>Where to eat cholent in Beit Shemesh</strong></a>
 <a class="inf-card wide" href="/cities/bnei-brak/"><span class="ph"><img src="${cityTop("Bnei Brak")?.img}" alt="" loading="lazy" width="480" height="600"></span><strong>The Bnei Brak cholent guide</strong></a>
 </div></div></section>
@@ -458,7 +473,7 @@ Object.assign(SEC, {
   heroShow: () => heroWrap(`<div><h1>${H1}</h1>
 <div class="hero-cta"><a class="btn" href="#locations">${ICON.search} Find a location</a><a class="btn ghost" href="#top-rated">Top rated</a></div></div>`,
     `<div class="ep-hero">
-<button class="big-ep" type="button" data-yt="${latest.video}" data-vertical="${isVertical(latest.video)}"><img src="${thumb(latest.video)}" alt="" width="480" height="600" fetchpriority="high"><span class="play"><span>${ICON.play}</span></span>${stamp(latest.score, "lg")}<span class="be-cap"><span class="label">This week</span><strong>${esc(latest.name)}</strong><span>${esc(latest.place)}</span></span></button>
+<button class="big-ep" type="button" data-yt="${latest.video}" data-vertical="${isVertical(latest.video)}"><img src="${heroThumb(latest.video)}" alt="" width="480" height="600" fetchpriority="high"><span class="play"><span>${ICON.play}</span></span>${stamp(latest.score, "lg")}<span class="be-cap"><span class="label">This week</span><strong>${esc(latest.name)}</strong><span>${esc(latest.place)}</span></span></button>
 <div class="next-eps">${eps.filter((v) => v.id !== latest.video).slice(0, 3).map((v) => { const r = revByVideo[v.id]; return `<button type="button" data-yt="${v.id}" data-vertical="${v.short !== false}"><img src="${thumb(v.id)}" alt="" width="160" height="200"><span class="play"><span>${ICON.play}</span></span>${r?.score ? stamp(r.score, "sm") : ""}</button>`; }).join("")}<a href="#reviews" class="all-eps">All reviews</a></div>
 </div>`, " show-hero"),
   heroDark: () => heroWrap(`<div><h1>${H1}</h1>
@@ -491,7 +506,7 @@ Object.assign(SEC, {
 <div class="hb-art">
 <img class="hb-bowl" src="/img/hero/bowl-real.webp" alt="" width="1100" height="1100" fetchpriority="high">
 <button class="frame" type="button" data-yt="${latest.video}" data-vertical="${isVertical(latest.video)}">
-<span class="frame-img"><img src="${thumb(latest.video)}" alt="" width="480" height="853"><span class="play"><span>${ICON.play}</span></span>${stamp(latest.score)}</span>
+<span class="frame-img"><img src="${heroThumb(latest.video)}" alt="" width="480" height="853"><span class="play"><span>${ICON.play}</span></span>${stamp(latest.score)}</span>
 <span class="frame-cap"><span class="label">This week's episode</span><strong>${esc(latest.name)}</strong><span class="meta">${esc(latest.place)}</span></span>
 </button>
 </div>
