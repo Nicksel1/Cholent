@@ -161,7 +161,20 @@ const gmapsUrl = (s) => s.placeId
   ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.he || s.name)}&query_place_id=${s.placeId}`
   : s.lat ? `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q(s) + " Israel")}`;
 
-spots.sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || (b.video ? 1 : 0) - (a.video ? 1 : 0) || a.cityLabel.localeCompare(b.cityLabel) || (a.nums[0] ?? 999) - (b.nums[0] ?? 999));
+// ---------- closed spots and hidden videos (set in the admin page) ----------
+// Read from the live site's admin data when the site is built. If it can't be read, nothing is closed or hidden.
+let admin = { edits: {}, videos: [] };
+const ADMIN_URL = process.env.ADMIN_DATA_URL || (process.env.URL ? process.env.URL.replace(/\/$/, "") + "/api/data" : "");
+if (ADMIN_URL) {
+  try { admin = { ...admin, ...(await (await fetch(ADMIN_URL, { signal: AbortSignal.timeout(10000) })).json()) }; }
+  catch (e) { console.log("Admin data not reachable at build time:", e.message); }
+}
+const HIDDEN_VIDEOS = new Set(admin.videos || []);
+for (const s of spots) s.closed = !!(admin.edits || {})[s.id]?.closed;
+const CLOSED_VIDEOS = new Set(spots.filter((s) => s.closed && s.video).map((s) => s.video));
+const offSite = (id) => !!id && (HIDDEN_VIDEOS.has(id) || CLOSED_VIDEOS.has(id)); // never "this week's episode" or in the Reviews strip
+if (CLOSED_VIDEOS.size || HIDDEN_VIDEOS.size) console.log(`Closed spots: ${spots.filter((s) => s.closed).length}, hidden videos: ${HIDDEN_VIDEOS.size}`);
+spots.sort((a, b) => (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || (b.score ?? -1) - (a.score ?? -1) || (b.video ? 1 : 0) - (a.video ? 1 : 0) || a.cityLabel.localeCompare(b.cityLabel) || (a.nums[0] ?? 999) - (b.nums[0] ?? 999));
 
 const cityCount = {};
 spots.forEach((s) => { if (s.city) cityCount[s.city] = (cityCount[s.city] || 0) + 1; });
@@ -169,16 +182,17 @@ const CITIES = Object.entries(cityCount).sort((a, b) => b[1] - a[1] || a[0].loca
 const CITY_PAGES = CITIES.filter(([, n]) => n >= 3).map(([c]) => c);
 const citySlug = (c) => slug(c);
 
-const ranked = REVIEWS.slice().sort((a, b) => b.score - a.score || b.date.localeCompare(a.date));
+const reviewClosed = (r) => spots.some((s) => s.closed && s.review && s.review.id === r.id);
+const ranked = REVIEWS.filter((r) => !reviewClosed(r)).sort((a, b) => b.score - a.score || b.date.localeCompare(a.date));
 const spotFor = (r) => spots.find((s) => s.review && s.review.id === r.id);
 const rated = spots.filter((s) => s.score != null).length;
 const total = spots.length;
-let latest = REVIEWS.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.ep ? 1 : 0) - (a.ep ? 1 : 0))[0];
+let latest = REVIEWS.filter((r) => !reviewClosed(r) && !offSite(r.video)).sort((a, b) => b.date.localeCompare(a.date) || (b.ep ? 1 : 0) - (a.ep ? 1 : 0))[0];
 // "This week's episode": ask the YouTube feed at build time, so the page is built with the newest
 // episode and doesn't swap the picture after it loads. Uses the same reader as /api/latest.
 // If YouTube can't be reached, the newest review above is used, as before.
 {
-  if (feed?.id && feed.id !== latest.video) {
+  if (feed?.id && feed.id !== latest.video && !offSite(feed.id)) {
     const known = [...REVIEWS, ...VISITS].find((r) => r.video === feed.id);
     latest = known ? { ...known, score: known.score ?? null } : { video: feed.id, name: feed.name, place: feed.place, score: feed.score ?? null };
   }
@@ -257,24 +271,24 @@ const initial = (s) => (s.en || s.name).replace(/^(ה|the\s)/i, "").trim().charA
 const nameHtml = (s) => s.en ? `<span class="en">${esc(s.en)}</span>` : `<span lang="he" dir="rtl">${esc(s.name)}</span>`;
 const sub = (s) => [s.cityLabel, DAYS[s.days] || s.days].filter(Boolean).join(" · ");
 
-const row = (s) => `<li class="row" data-id="${s.id}"><a href="${s.url}">
+const row = (s) => `<li class="row${s.closed ? " closed" : ""}" data-id="${s.id}"><a href="${s.url}">
 ${rowPhoto(s)}
 <span class="nm"><strong>${nameHtml(s)}</strong><span class="sub">${esc(sub(s))}</span>${s.kosher ? `<span class="k" lang="${hasHe(s.kosher) ? "he" : "en"}">${esc(s.kosher)}</span>` : ""}</span>
-<span class="side">${s.score != null ? stamp(s.score, "sm") : s.video ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span>
+<span class="side">${s.closed ? '<span class="tag closed-tag">Closed</span>' : ""}${s.score != null ? stamp(s.score, "sm") : s.video && !s.closed ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span>
 </a></li>`;
 
 const clientSpot = (s) => ({
   i: s.id, n: s.display, e: s.en || "", h: s.he, al: s.alias.trim(), c: s.cityLabel, ch: CITY_HE[s.city] || "", a: s.address || "", la: s.lat, lo: s.lng, p: s.phone ? fmtPhone(s.phone) : "",
   t: s.phone ? tel(s.phone) : "", d: s.days, k: s.kosher || "", s: s.score, v: s.video, vv: s.video ? isVertical(s.video) : true,
   q: s.review?.verdict || "", pr: s.review?.price || "", cm: !!s.review?.comped, im: s.real ? s.img : "", pid: s.placeId || "", l: initial(s), real: s.real, u: s.url, w: wazeUrl(s), g: gmapsUrl(s),
-  ep: s.review?.ep || "",
+  ep: s.review?.ep || "", cl: s.closed ? 1 : 0,
 });
 
 // ---------- home ----------
 const H1 = "Where are you eating tonight?";
 const nextThu = (() => { const d = new Date(); d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7)); return d; })();
 const thuStr = nextThu.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-const eps = rawVideos.filter((v) => !/^Taste Testing|^We tried making/.test(v.title) && v.id !== "46rbDy-FkVA").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
+const eps = rawVideos.filter((v) => !/^Taste Testing|^We tried making/.test(v.title) && v.id !== "46rbDy-FkVA" && !offSite(v.id)).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
 const revByVideo = Object.fromEntries([...REVIEWS, ...VISITS].map((r) => [r.video, r]));
 const ymd = (d) => fmtDate(d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6));
 
@@ -578,6 +592,7 @@ ${variant === "maplist" ? `<script src="/maplist.js?v=${V}" defer></script>` : "
 }
 
 // ---------- spot page ----------
+const CLOSED_BANNER = `<div class="closed-banner" role="alert"><div class="wrap"><strong>Closed</strong><span>This place is no longer open. Please don't go there.</span></div></div>`;
 const media = (s) => {
   if (s.video) {
     const v = isVertical(s.video);
@@ -624,7 +639,7 @@ function spotPage(s) {
   const gkey = s.placeId && !s.real;
   return head({ title, desc, url: s.url, og, ld: [ld], extra: gkey ? '<link rel="preconnect" href="https://maps.googleapis.com"><link rel="preconnect" href="https://maps.gstatic.com" crossorigin><link rel="preconnect" href="https://lh3.googleusercontent.com">' : "" }) + header(false) + `
 <main id="main" tabindex="-1">
-<div class="wrap crumbs"><a href="/#locations">All locations</a>${s.city && CITY_PAGES.includes(s.city) ? ` / <a href="/cities/${citySlug(s.city)}/">${esc(s.city)}</a>` : ""}</div>
+${s.closed ? CLOSED_BANNER : ""}<div class="wrap crumbs"><a href="/#locations">All locations</a>${s.city && CITY_PAGES.includes(s.city) ? ` / <a href="/cities/${citySlug(s.city)}/">${esc(s.city)}</a>` : ""}</div>
 <article class="spot"><div class="wrap">
 <div class="sp-top">
 ${r?.ep ? `<div class="label">${esc(r.ep)}</div>` : ""}
@@ -657,7 +672,7 @@ function cityPage(c) {
   const he = CITY_HE[c];
   const title = `Cholent in ${c}: ${list.length} Thursday night spots | Cholent & Chill`;
   const desc = `${list.length} places for Leil Shishi cholent in ${c}${r.length ? `, ${r.length} rated on camera` : ""}. Addresses, kashrut, hours and directions.`;
-  const pts = list.filter((s) => s.lat).map((s) => [s.lat, s.lng, s.score ?? "", s.url, s.display]);
+  const pts = list.filter((s) => s.lat && !s.closed).map((s) => [s.lat, s.lng, s.score ?? "", s.url, s.display]);
   return head({ title, desc, url: `/cities/${citySlug(c)}/`, ld: [{ "@context": "https://schema.org", "@type": "ItemList", name: `Cholent in ${c}`, itemListElement: list.map((s, i) => ({ "@type": "ListItem", position: i + 1, url: SITE + s.url, name: s.display })) }] }) + header(false) + `
 <main id="main" tabindex="-1">
 <div class="wrap crumbs"><a href="/#locations">All locations</a> / ${esc(c)}</div>
