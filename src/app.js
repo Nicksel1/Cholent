@@ -461,8 +461,11 @@ ${s.u ? `<a class="more-link" href="${s.u}">Full page →</a>` : ""}`;
   function rowEl(x) {
     const li = document.createElement("li");
     li.className = "row"; li.dataset.id = x.i;
-    const img = x.im || (x.v ? yt(x.v) : "");
-    li.innerHTML = `<a href="${x.u || x.g}"${x.u ? "" : ' target="_blank" rel="noopener"'}><span class="ph"${x.pid ? ` data-pid="${x.pid}"` : ""}>${img ? `<img src="${img}" alt="" loading="lazy" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(x.l)}</span>`}</span>
+    // rated (filmed): episode thumbnail. Not rated: Google Maps photo, or the video if there's no Google listing.
+    const vimg = x.v ? (x.im || yt(x.v)) : "";
+    const pid = (x.s != null && vimg) ? "" : x.pid;
+    const img = pid ? "" : vimg;
+    li.innerHTML = `<a href="${x.u || x.g}"${x.u ? "" : ' target="_blank" rel="noopener"'}><span class="ph"${pid ? ` data-pid="${pid}"` : ""}>${img ? `<img src="${img}" alt="" loading="lazy" width="64" height="64">` : `<span class="tile" aria-hidden="true">${esc(x.l)}</span>`}</span>
 <span class="nm"><strong>${x.e ? `<span class="en">${esc(x.e)}</span>` : `<span lang="he" dir="rtl">${esc(x.n)}</span>`}</strong><span class="sub">${esc(x.c)} · ${esc(DAYS[x.d] || x.d)}</span></span>
 <span class="side">${x.s != null ? `<span class="stamp sm ${x.s >= 9 ? "top" : ""}">${x.s.toFixed(1)}<small>/10</small></span>` : x.v ? '<span class="tag">Video</span>' : ""}<span class="dist"></span></span></a>`;
     return li;
