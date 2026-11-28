@@ -154,9 +154,20 @@ async function geocode(q) {
   const x = (await (await fetch(u, { signal: AbortSignal.timeout(10000) })).json()).results?.[0];
   return x ? { lat: +x.geometry.location.lat.toFixed(5), lng: +x.geometry.location.lng.toFixed(5), placeId: x.place_id } : null;
 }
-const cityOf = (addr, fallback) => { const tail = String(addr).split(",").pop().trim(); return HE_CITY[tail] || tail || fallback; };
+// City from an address: the part after the last comma, or a known city name at the end ("מלכי ישראל 5 ירושלים").
+const cityOf = (addr, fallback) => {
+  const a = String(addr).trim(), tail = a.split(",").pop().trim();
+  if (HE_CITY[tail]) return HE_CITY[tail];
+  if (a.includes(",")) return tail || fallback;
+  const he = Object.keys(HE_CITY).sort((x, y) => y.length - x.length).find((c) => a.endsWith(c));
+  if (he) return HE_CITY[he];
+  const en = Object.values(HE_CITY).sort((x, y) => y.length - x.length).find((c) => a.toLowerCase().endsWith(c.toLowerCase()));
+  return en || fallback;
+};
 try {
-  const auto = await autoSpots({ videos: rawVideos, spots, skip: (id) => HIDDEN_VIDEOS.has(id), geocode, cityOf, visitOf });
+  // Videos already used by spots added or edited in the admin page: his own entry wins, so don't add them again.
+  const ADMIN_VIDEOS = new Set([...(admin.added || []), ...Object.values(admin.edits || {})].map((x) => x.video).filter(Boolean));
+  const auto = await autoSpots({ videos: rawVideos, spots, skip: (id) => HIDDEN_VIDEOS.has(id) || ADMIN_VIDEOS.has(id), geocode, cityOf, visitOf });
   for (const { review: r, spot } of auto.added) {
     REVIEWS.push(r);
     let s = spot;
